@@ -1,0 +1,5 @@
+[workspace]
+members = [
+    "example",
+    "egui-d3d9"
+]

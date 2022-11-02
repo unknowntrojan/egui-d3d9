@@ -1,0 +1,36 @@
+[package]
+name = "example-wnd"
+version = "0.1.0"
+edition = "2021"
+authors = ["unknowntrojan", "sy1ntexx"]
+description = "Example dll for egui d3d11 showcase."
+license = "MIT"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+egui = "0.19"
+libc = "*"
+image = { version = "*" }
+shroud = { version = "*", features = ["directx9"] }
+detour = { git = "https://github.com/lostinspiration/detour-rs" }
+egui-d3d9 = { path = "../egui-d3d9" }
+
+[dependencies.egui_extras]
+version = "0.19"
+features = ["image"]
+
+[dependencies.windows]
+version = "*"
+features = [
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_Graphics_Dxgi_Common",
+    "Win32_Graphics_Direct3D9",
+    "Win32_Graphics_Dxgi",
+    "Win32_Graphics_Gdi",
+    "Win32_System_Console",
+    "Win32_Foundation",
+	"Win32_System_LibraryLoader"
+]
