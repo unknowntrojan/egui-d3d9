@@ -4,17 +4,21 @@ use clipboard::{windows_clipboard::WindowsClipboardContext, ClipboardProvider};
 use egui::{epaint::Primitive, Context};
 use windows::Win32::{
     Foundation::{HWND, LPARAM, RECT, WPARAM},
-    Graphics::Direct3D9::{
-        IDirect3DDevice9, IDirect3DSurface9, D3DBACKBUFFER_TYPE_MONO, D3DBLENDOP_ADD,
-        D3DBLEND_INVSRCALPHA, D3DBLEND_ONE, D3DBLEND_SRCALPHA, D3DCULL_NONE, D3DFILL_SOLID,
-        D3DPT_TRIANGLELIST, D3DRS_ALPHABLENDENABLE, D3DRS_ALPHATESTENABLE, D3DRS_BLENDOP,
-        D3DRS_CLIPPING, D3DRS_CULLMODE, D3DRS_DESTBLEND, D3DRS_DESTBLENDALPHA, D3DRS_FILLMODE,
-        D3DRS_FOGENABLE, D3DRS_LIGHTING, D3DRS_RANGEFOGENABLE, D3DRS_SCISSORTESTENABLE,
-        D3DRS_SEPARATEALPHABLENDENABLE, D3DRS_SHADEMODE, D3DRS_SPECULARENABLE, D3DRS_SRCBLEND,
-        D3DRS_SRCBLENDALPHA, D3DRS_STENCILENABLE, D3DRS_ZENABLE, D3DRS_ZWRITEENABLE,
-        D3DSAMP_MAGFILTER, D3DSAMP_MINFILTER, D3DSAMP_MIPFILTER, D3DSHADE_GOURAUD, D3DTEXF_LINEAR,
-        D3DTOP_DISABLE, D3DTOP_MODULATE, D3DTSS_ALPHAARG1, D3DTSS_ALPHAARG2, D3DTSS_ALPHAOP,
-        D3DTSS_COLORARG1, D3DTSS_COLORARG2, D3DTSS_COLOROP, D3DVIEWPORT9,
+    Graphics::{
+        Direct3D::{D3DMATRIX, D3DMATRIX_0},
+        Direct3D9::{
+            IDirect3DDevice9, IDirect3DSurface9, D3DBACKBUFFER_TYPE_MONO, D3DBLENDOP_ADD,
+            D3DBLEND_INVSRCALPHA, D3DBLEND_ONE, D3DBLEND_SRCALPHA, D3DCULL_NONE, D3DFILL_SOLID,
+            D3DPT_TRIANGLELIST, D3DRS_ALPHABLENDENABLE, D3DRS_ALPHATESTENABLE, D3DRS_BLENDOP,
+            D3DRS_CLIPPING, D3DRS_CULLMODE, D3DRS_DESTBLEND, D3DRS_DESTBLENDALPHA, D3DRS_FILLMODE,
+            D3DRS_FOGENABLE, D3DRS_LIGHTING, D3DRS_RANGEFOGENABLE, D3DRS_SCISSORTESTENABLE,
+            D3DRS_SEPARATEALPHABLENDENABLE, D3DRS_SHADEMODE, D3DRS_SPECULARENABLE, D3DRS_SRCBLEND,
+            D3DRS_SRCBLENDALPHA, D3DRS_STENCILENABLE, D3DRS_ZENABLE, D3DRS_ZWRITEENABLE,
+            D3DSAMP_MAGFILTER, D3DSAMP_MINFILTER, D3DSAMP_MIPFILTER, D3DSHADE_GOURAUD,
+            D3DTEXF_LINEAR, D3DTOP_DISABLE, D3DTOP_MODULATE, D3DTSS_ALPHAARG1, D3DTSS_ALPHAARG2,
+            D3DTSS_ALPHAOP, D3DTSS_COLORARG1, D3DTSS_COLORARG2, D3DTSS_COLOROP, D3DTS_PROJECTION,
+            D3DTS_VIEW, D3DTS_WORLD, D3DVIEWPORT9,
+        },
     },
     System::SystemServices::{D3DTA_DIFFUSE, D3DTA_TEXTURE},
     UI::WindowsAndMessaging::GetClientRect,
@@ -67,6 +71,10 @@ impl<T> EguiDx9<T> {
         }
 
         if output.shapes.is_empty() {
+            // early return, don't forget to free textures
+            if !output.textures_delta.is_empty() {
+                self.tex_man.process_free_deltas(&output.textures_delta);
+            }
             return;
         }
 
@@ -159,6 +167,61 @@ impl<T> EguiDx9<T> {
             expect!(dev.SetPixelShader(None), "unable to unset pxl shader");
             expect!(dev.SetVertexShader(None), "unable to unset vtx shader");
             expect!(dev.SetFVF(FVF_CUSTOMVERTEX), "unable to set fvf");
+
+            let screen_size = self.get_screen_size();
+
+            // set up matrix
+            let l = 0.5;
+            let r = screen_size.0 + 0.5;
+            let t = 0.5;
+            let b = screen_size.1 + 0.5;
+
+            let mat_ident = D3DMATRIX {
+                Anonymous: D3DMATRIX_0 {
+                    m: [
+                        1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
+                        1.0,
+                    ],
+                },
+            };
+
+            let mat_proj = D3DMATRIX {
+                Anonymous: D3DMATRIX_0 {
+                    m: [
+                        2.0 / (r - l),
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        2.0 / (t - b),
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.5,
+                        0.0,
+                        (l + r) / (l - r),
+                        (t + b) / (b - t),
+                        0.5,
+                        1.0,
+                    ],
+                },
+            };
+
+            expect!(
+                dev.SetTransform(D3DTS_WORLD, &mat_ident),
+                "unable to set world matrix"
+            );
+
+            expect!(
+                dev.SetTransform(D3DTS_VIEW, &mat_ident),
+                "unable to set view matrix"
+            );
+
+            expect!(
+                dev.SetTransform(D3DTS_PROJECTION, &mat_proj),
+                "unable to set projection matrix"
+            );
 
             // set up render state
             expect!(

@@ -5,13 +5,13 @@ use windows::Win32::{
         IDirect3DDevice9, IDirect3DIndexBuffer9, IDirect3DVertexBuffer9, D3DFMT_INDEX32,
         D3DLOCK_DISCARD, D3DPOOL_DEFAULT, D3DUSAGE_DYNAMIC, D3DUSAGE_WRITEONLY,
     },
-    System::SystemServices::{D3DFVF_DIFFUSE, D3DFVF_TEX1, D3DFVF_XYZRHW},
+    System::SystemServices::{D3DFVF_DIFFUSE, D3DFVF_TEX1, D3DFVF_XYZ},
 };
 
-// XYZRHW is 64 bits completely wasted per vertex.
+// XYZ is 32 bits completely wasted per vertex.
 // but that's the cost of doing business, I really cba dealing with shaders again
 // although I'll probably do it at some point
-pub const FVF_CUSTOMVERTEX: u32 = D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1;
+pub const FVF_CUSTOMVERTEX: u32 = D3DFVF_XYZ | D3DFVF_DIFFUSE | D3DFVF_TEX1;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -50,7 +50,7 @@ impl GpuMesh {
                 .vertices
                 .into_iter()
                 .map(|v| GpuVertex {
-                    pos: [v.pos.x - 0.5, v.pos.y - 0.5, 0f32, 1f32],
+                    pos: [v.pos.x, v.pos.y, 0f32],
                     uv: v.uv,
                     color: v.color.into(),
                 })
@@ -69,7 +69,7 @@ impl GpuMesh {
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct GpuVertex {
-    pos: [f32; 4],
+    pos: [f32; 3],
     color: VertexColor,
     uv: Pos2,
 }
