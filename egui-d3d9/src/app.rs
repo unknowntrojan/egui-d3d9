@@ -4,30 +4,14 @@ use clipboard::{windows_clipboard::WindowsClipboardContext, ClipboardProvider};
 use egui::{epaint::Primitive, Context};
 use windows::Win32::{
     Foundation::{HWND, LPARAM, RECT, WPARAM},
-    Graphics::{
-        Direct3D::{D3DMATRIX, D3DMATRIX_0},
-        Direct3D9::{
-            IDirect3DDevice9, IDirect3DSurface9, D3DBACKBUFFER_TYPE_MONO, D3DBLENDOP_ADD,
-            D3DBLEND_INVSRCALPHA, D3DBLEND_ONE, D3DBLEND_SRCALPHA, D3DCULL_NONE, D3DFILL_SOLID,
-            D3DPT_TRIANGLELIST, D3DRS_ALPHABLENDENABLE, D3DRS_ALPHATESTENABLE, D3DRS_BLENDOP,
-            D3DRS_CLIPPING, D3DRS_CULLMODE, D3DRS_DESTBLEND, D3DRS_DESTBLENDALPHA, D3DRS_FILLMODE,
-            D3DRS_FOGENABLE, D3DRS_LIGHTING, D3DRS_RANGEFOGENABLE, D3DRS_SCISSORTESTENABLE,
-            D3DRS_SEPARATEALPHABLENDENABLE, D3DRS_SHADEMODE, D3DRS_SPECULARENABLE, D3DRS_SRCBLEND,
-            D3DRS_SRCBLENDALPHA, D3DRS_STENCILENABLE, D3DRS_ZENABLE, D3DRS_ZWRITEENABLE,
-            D3DSAMP_MAGFILTER, D3DSAMP_MINFILTER, D3DSAMP_MIPFILTER, D3DSHADE_GOURAUD,
-            D3DTEXF_LINEAR, D3DTOP_DISABLE, D3DTOP_MODULATE, D3DTSS_ALPHAARG1, D3DTSS_ALPHAARG2,
-            D3DTSS_ALPHAOP, D3DTSS_COLORARG1, D3DTSS_COLORARG2, D3DTSS_COLOROP, D3DTS_PROJECTION,
-            D3DTS_VIEW, D3DTS_WORLD, D3DVIEWPORT9,
-        },
-    },
-    System::SystemServices::{D3DTA_DIFFUSE, D3DTA_TEXTURE},
+    Graphics::Direct3D9::{IDirect3DDevice9, D3DPT_TRIANGLELIST, D3DVIEWPORT9},
     UI::WindowsAndMessaging::GetClientRect,
 };
 
 use crate::{
-    backup,
     inputman::InputManager,
-    mesh::{create_buffers, GpuMesh, GpuVertex, FVF_CUSTOMVERTEX},
+    mesh::{Buffers, GpuMesh, GpuVertex},
+    state::DxState,
     texman::TextureManager,
 };
 
@@ -54,8 +38,10 @@ impl<T> EguiDx9<T> {
     }
 
     pub fn present(&mut self, dev: &IDirect3DDevice9) {
-        // back up our state so we don't mess with the game.
-        let _state_block = backup::StateBackup::new(dev);
+        // back up our state so we don't mess with the game and the game doesn't mess with us.
+        // i actually had the idea to use BeginStateBlock and co. to "cache" the state we set every frame,
+        // and just re-applying it everytime. this has a very low performance impact, so it doesn't matter.
+        let _state = DxState::setup(dev, self.get_viewport());
 
         let output = self.ctx.run(self.input_man.collect_input(), |ctx| {
             // safe. present will never run in parallel.
@@ -78,8 +64,6 @@ impl<T> EguiDx9<T> {
             return;
         }
 
-        self.setup_state(dev);
-
         let prims: Vec<GpuMesh> = self
             .ctx
             .tessellate(output.shapes)
@@ -93,8 +77,20 @@ impl<T> EguiDx9<T> {
             })
             .collect();
 
+        // instead of only making one buffer and updating it, we could merge all meshes.
+        // we could then compute an offset into the buffer and apply new scissor rects
+        // etc. simply by knowing which index we're at.
+        let (total_vertices, total_indices) = prims.iter().fold((0, 0), |acc, mesh| {
+            (
+                std::cmp::max(acc.0, mesh.vertices.len()),
+                std::cmp::max(acc.1, mesh.indices.len()),
+            )
+        });
+
+        let mut buffers = Buffers::create_buffers(dev, total_vertices, total_indices);
+
         prims.iter().for_each(|mesh: &GpuMesh| unsafe {
-            let buffers = create_buffers(dev, mesh);
+            buffers.update_buffers(mesh);
 
             expect!(
                 dev.SetScissorRect(&RECT {
@@ -143,222 +139,6 @@ impl<T> EguiDx9<T> {
 }
 
 impl<T> EguiDx9<T> {
-    fn setup_state(&self, dev: &IDirect3DDevice9) {
-        // DON'T LOOK! I SPAMMED THESE FOR DEBUG REASONS, THIS SHOULD RETURN A RESULT IN AN IDEAL WORLD
-
-        unsafe {
-            // general set up
-            let backbuffer: IDirect3DSurface9 = expect!(
-                dev.GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO),
-                "failed to get swapchain's backbuffer"
-            );
-
-            expect!(
-                dev.SetRenderTarget(0, &backbuffer),
-                "unable to set the render target to the back buffer"
-            );
-
-            expect!(
-                dev.SetViewport(&self.get_viewport()),
-                "unable to set viewport"
-            );
-
-            // set up fvf
-            expect!(dev.SetPixelShader(None), "unable to unset pxl shader");
-            expect!(dev.SetVertexShader(None), "unable to unset vtx shader");
-            expect!(dev.SetFVF(FVF_CUSTOMVERTEX), "unable to set fvf");
-
-            let screen_size = self.get_screen_size();
-
-            // set up matrix
-            let l = 0.5;
-            let r = screen_size.0 + 0.5;
-            let t = 0.5;
-            let b = screen_size.1 + 0.5;
-
-            let mat_ident = D3DMATRIX {
-                Anonymous: D3DMATRIX_0 {
-                    m: [
-                        1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
-                        1.0,
-                    ],
-                },
-            };
-
-            let mat_proj = D3DMATRIX {
-                Anonymous: D3DMATRIX_0 {
-                    m: [
-                        2.0 / (r - l),
-                        0.0,
-                        0.0,
-                        0.0,
-                        0.0,
-                        2.0 / (t - b),
-                        0.0,
-                        0.0,
-                        0.0,
-                        0.0,
-                        0.5,
-                        0.0,
-                        (l + r) / (l - r),
-                        (t + b) / (b - t),
-                        0.5,
-                        1.0,
-                    ],
-                },
-            };
-
-            expect!(
-                dev.SetTransform(D3DTS_WORLD, &mat_ident),
-                "unable to set world matrix"
-            );
-
-            expect!(
-                dev.SetTransform(D3DTS_VIEW, &mat_ident),
-                "unable to set view matrix"
-            );
-
-            expect!(
-                dev.SetTransform(D3DTS_PROJECTION, &mat_proj),
-                "unable to set projection matrix"
-            );
-
-            // set up render state
-            expect!(
-                dev.SetRenderState(D3DRS_FILLMODE, D3DFILL_SOLID.0 as _),
-                "unable to set render state"
-            );
-            expect!(
-                dev.SetRenderState(D3DRS_SHADEMODE, D3DSHADE_GOURAUD.0 as _),
-                "unable to set render state"
-            );
-            expect!(
-                dev.SetRenderState(D3DRS_ZWRITEENABLE, false.into()),
-                "unable to set render state"
-            );
-            expect!(
-                dev.SetRenderState(D3DRS_ALPHATESTENABLE, false.into()),
-                "unable to set render state"
-            );
-            expect!(
-                dev.SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE.0 as _),
-                "unable to set render state"
-            );
-            expect!(
-                dev.SetRenderState(D3DRS_ZENABLE, false.into()),
-                "unable to set render state"
-            );
-            expect!(
-                dev.SetRenderState(D3DRS_ALPHABLENDENABLE, true.into()),
-                "unable to set render state"
-            );
-            expect!(
-                dev.SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD.0 as _),
-                "unable to set render state"
-            );
-            expect!(
-                dev.SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA.0 as _),
-                "unable to set render state"
-            );
-            expect!(
-                dev.SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA.0 as _),
-                "unable to set render state"
-            );
-            expect!(
-                dev.SetRenderState(D3DRS_SEPARATEALPHABLENDENABLE, true.into()),
-                "unable to set render state"
-            );
-            expect!(
-                dev.SetRenderState(D3DRS_SRCBLENDALPHA, D3DBLEND_ONE.0 as _),
-                "unable to set render state"
-            );
-            expect!(
-                dev.SetRenderState(D3DRS_DESTBLENDALPHA, D3DBLEND_INVSRCALPHA.0 as _),
-                "unable to set render state"
-            );
-            expect!(
-                dev.SetRenderState(D3DRS_SCISSORTESTENABLE, true.into()),
-                "unable to set render state"
-            );
-            expect!(
-                dev.SetRenderState(D3DRS_FOGENABLE, false.into()),
-                "unable to set render state"
-            );
-            expect!(
-                dev.SetRenderState(D3DRS_RANGEFOGENABLE, false.into()),
-                "unable to set render state"
-            );
-            expect!(
-                dev.SetRenderState(D3DRS_SPECULARENABLE, false.into()),
-                "unable to set render state"
-            );
-            expect!(
-                dev.SetRenderState(D3DRS_STENCILENABLE, false.into()),
-                "unable to set render state"
-            );
-            expect!(
-                dev.SetRenderState(D3DRS_CLIPPING, true.into()),
-                "unable to set render state"
-            );
-            expect!(
-                dev.SetRenderState(D3DRS_LIGHTING, false.into()),
-                "unable to set render state"
-            );
-            // expect!(
-            //     dev.SetRenderState(D3DRS_LASTPIXEL, false.into()),
-            //     "unable to set render state"
-            // );
-
-            // set up texture stages
-            expect!(
-                dev.SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE.0 as _),
-                "unable to set texture stage state"
-            );
-            expect!(
-                dev.SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE),
-                "unable to set texture stage state"
-            );
-            expect!(
-                dev.SetTextureStageState(0, D3DTSS_COLORARG2, D3DTA_DIFFUSE),
-                "unable to set texture stage state"
-            );
-            expect!(
-                dev.SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE.0 as _),
-                "unable to set texture stage state"
-            );
-            expect!(
-                dev.SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE),
-                "unable to set texture stage state"
-            );
-            expect!(
-                dev.SetTextureStageState(0, D3DTSS_ALPHAARG2, D3DTA_DIFFUSE),
-                "unable to set texture stage state"
-            );
-            expect!(
-                dev.SetTextureStageState(1, D3DTSS_COLOROP, D3DTOP_DISABLE.0 as _),
-                "unable to set texture stage state"
-            );
-            expect!(
-                dev.SetTextureStageState(1, D3DTSS_ALPHAOP, D3DTOP_DISABLE.0 as _),
-                "unable to set texture stage state"
-            );
-
-            // set up sampler
-            expect!(
-                dev.SetSamplerState(0, D3DSAMP_MINFILTER, D3DTEXF_LINEAR.0 as _),
-                "unable to set sampler state"
-            );
-            expect!(
-                dev.SetSamplerState(0, D3DSAMP_MIPFILTER, D3DTEXF_LINEAR.0 as _),
-                "unable to set sampler state"
-            );
-            expect!(
-                dev.SetSamplerState(0, D3DSAMP_MAGFILTER, D3DTEXF_LINEAR.0 as _),
-                "unable to set sampler state"
-            );
-        }
-    }
-
     #[inline]
     fn get_screen_size(&self) -> (f32, f32) {
         let mut rect = RECT::default();

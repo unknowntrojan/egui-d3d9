@@ -79,19 +79,27 @@ pub struct Buffers {
     pub idx: IDirect3DIndexBuffer9,
 }
 
-pub fn create_buffers(dev: &IDirect3DDevice9, mesh: &GpuMesh) -> Buffers {
-    Buffers {
-        vtx: create_vertex_buffer(dev, mesh),
-        idx: create_index_buffer(dev, mesh),
+impl Buffers {
+    pub fn create_buffers(device: &IDirect3DDevice9, vertices: usize, indices: usize) -> Buffers {
+        Buffers {
+            vtx: create_vertex_buffer(device, vertices),
+            idx: create_index_buffer(device, indices),
+        }
+    }
+
+    pub fn update_buffers(&mut self, mesh: &GpuMesh) {
+        // update the buffers with new information
+        update_vertex_buffer(mesh, &mut self.vtx);
+        update_index_buffer(mesh, &mut self.idx);
     }
 }
 
-fn create_vertex_buffer(device: &IDirect3DDevice9, mesh: &GpuMesh) -> IDirect3DVertexBuffer9 {
+fn create_vertex_buffer(device: &IDirect3DDevice9, vertices: usize) -> IDirect3DVertexBuffer9 {
     unsafe {
         let mut vertex_buffer: Option<IDirect3DVertexBuffer9> = None;
         expect!(
             device.CreateVertexBuffer(
-                (mesh.vertices.len() * std::mem::size_of::<GpuVertex>()) as u32,
+                (vertices * std::mem::size_of::<GpuVertex>()) as u32,
                 (D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY) as _,
                 FVF_CUSTOMVERTEX,
                 D3DPOOL_DEFAULT,
@@ -101,12 +109,16 @@ fn create_vertex_buffer(device: &IDirect3DDevice9, mesh: &GpuMesh) -> IDirect3DV
             "Failed to create vertex buffer"
         );
 
-        let vertex_buffer = expect!(vertex_buffer, "unable to create vertex buffer");
+        expect!(vertex_buffer, "unable to create vertex buffer")
+    }
+}
 
+fn update_vertex_buffer(mesh: &GpuMesh, vtx: &mut IDirect3DVertexBuffer9) {
+    unsafe {
         let mut buffer: *mut GpuVertex = std::mem::zeroed();
 
         expect!(
-            vertex_buffer.Lock(
+            vtx.Lock(
                 0,
                 mesh.vertices.len() as u32 * std::mem::size_of::<GpuVertex>() as u32,
                 std::mem::transmute(&mut buffer),
@@ -119,18 +131,16 @@ fn create_vertex_buffer(device: &IDirect3DDevice9, mesh: &GpuMesh) -> IDirect3DV
 
         buffer.copy_from_slice(mesh.vertices.as_slice());
 
-        expect!(vertex_buffer.Unlock(), "unable to unlock vtx buffer");
-
-        vertex_buffer
+        expect!(vtx.Unlock(), "unable to unlock vtx buffer");
     }
 }
 
-fn create_index_buffer(device: &IDirect3DDevice9, mesh: &GpuMesh) -> IDirect3DIndexBuffer9 {
+fn create_index_buffer(device: &IDirect3DDevice9, indices: usize) -> IDirect3DIndexBuffer9 {
     unsafe {
         let mut index_buffer: Option<IDirect3DIndexBuffer9> = None;
         expect!(
             device.CreateIndexBuffer(
-                (mesh.indices.len() * std::mem::size_of::<u32>()) as u32,
+                (indices * std::mem::size_of::<u32>()) as u32,
                 (D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY) as _,
                 D3DFMT_INDEX32,
                 D3DPOOL_DEFAULT,
@@ -140,12 +150,16 @@ fn create_index_buffer(device: &IDirect3DDevice9, mesh: &GpuMesh) -> IDirect3DIn
             "Failed to create index buffer"
         );
 
-        let index_buffer = expect!(index_buffer, "unable to create index buffer");
+        expect!(index_buffer, "unable to create index buffer")
+    }
+}
 
+fn update_index_buffer(mesh: &GpuMesh, idx: &mut IDirect3DIndexBuffer9) {
+    unsafe {
         let mut buffer: *mut u32 = std::mem::zeroed();
 
         expect!(
-            index_buffer.Lock(
+            idx.Lock(
                 0,
                 mesh.indices.len() as u32 * std::mem::size_of::<u32>() as u32,
                 std::mem::transmute(&mut buffer),
@@ -158,8 +172,6 @@ fn create_index_buffer(device: &IDirect3DDevice9, mesh: &GpuMesh) -> IDirect3DIn
 
         buffer.copy_from_slice(mesh.indices.as_slice());
 
-        expect!(index_buffer.Unlock(), "unable to unlock idx buffer");
-
-        index_buffer
+        expect!(idx.Unlock(), "unable to unlock idx buffer");
     }
 }
