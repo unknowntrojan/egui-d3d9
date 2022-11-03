@@ -39,7 +39,8 @@ impl TextureManager {
 impl TextureManager {
     pub fn process_set_deltas(&mut self, dev: &IDirect3DDevice9, delta: &TexturesDelta) {
         delta.set.iter().for_each(|(tid, delta)| {
-            if let Some(_) = self.textures.get(tid) {
+            // check if this texture already exists
+            if self.textures.get(tid).is_some() {
                 if delta.is_whole() {
                     // update the entire texture
                     self.update_texture_whole(dev, tid, &delta.image);
@@ -266,7 +267,7 @@ fn new_texture_from_buffer(
             dev.CreateTexture(
                 size[0] as _,
                 size[1] as _,
-                0,
+                1,
                 D3DUSAGE_DYNAMIC as _,
                 D3DFMT_A8R8G8B8,
                 D3DPOOL_DEFAULT,
