@@ -34,19 +34,19 @@ impl From<Color32> for VertexColor {
     }
 }
 
-pub struct GpuMesh {
-    pub indices: Vec<u32>,
-    pub vertices: Vec<GpuVertex>,
+pub struct MeshDescriptor {
+    pub indices: usize,
+    pub vertices: usize,
     pub clip: Rect,
     pub texture_id: TextureId,
 }
 
-impl GpuMesh {
-    pub fn from_mesh(mesh: Mesh, scissors: Rect) -> Option<Self> {
+impl MeshDescriptor {
+    pub fn from_mesh(mesh: Mesh, scissors: Rect) -> Option<(Self, Vec<GpuVertex>, Vec<u32>)> {
         if mesh.indices.is_empty() || mesh.indices.len() % 3 != 0 {
             None
         } else {
-            let vertices = mesh
+            let vertices: Vec<GpuVertex> = mesh
                 .vertices
                 .into_iter()
                 .map(|v| GpuVertex {
@@ -56,12 +56,16 @@ impl GpuMesh {
                 })
                 .collect();
 
-            Some(Self {
-                texture_id: mesh.texture_id,
-                indices: mesh.indices,
-                clip: scissors,
+            Some((
+                Self {
+                    texture_id: mesh.texture_id,
+                    indices: mesh.indices.len(),
+                    clip: scissors,
+                    vertices: vertices.len(),
+                },
                 vertices,
-            })
+                mesh.indices,
+            ))
         }
     }
 }
@@ -77,101 +81,123 @@ pub struct GpuVertex {
 pub struct Buffers {
     pub vtx: IDirect3DVertexBuffer9,
     pub idx: IDirect3DIndexBuffer9,
+    vtx_size: usize,
+    idx_size: usize,
 }
 
 impl Buffers {
-    pub fn create_buffers(device: &IDirect3DDevice9, vertices: usize, indices: usize) -> Buffers {
+    pub fn create_buffers(
+        device: &IDirect3DDevice9,
+        vtx_count: usize,
+        idx_count: usize,
+    ) -> Buffers {
         Buffers {
-            vtx: create_vertex_buffer(device, vertices),
-            idx: create_index_buffer(device, indices),
+            vtx_size: vtx_count,
+            idx_size: idx_count,
+            vtx: Self::create_vertex_buffer(device, vtx_count),
+            idx: Self::create_index_buffer(device, idx_count),
         }
     }
 
-    pub fn update_buffers(&mut self, mesh: &GpuMesh) {
-        // update the buffers with new information
-        update_vertex_buffer(mesh, &mut self.vtx);
-        update_index_buffer(mesh, &mut self.idx);
+    fn create_vertex_buffer(device: &IDirect3DDevice9, vertices: usize) -> IDirect3DVertexBuffer9 {
+        unsafe {
+            let mut vertex_buffer: Option<IDirect3DVertexBuffer9> = None;
+            expect!(
+                device.CreateVertexBuffer(
+                    (vertices * std::mem::size_of::<GpuVertex>()) as u32,
+                    (D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY) as _,
+                    FVF_CUSTOMVERTEX,
+                    D3DPOOL_DEFAULT,
+                    &mut vertex_buffer,
+                    std::ptr::null_mut::<HANDLE>()
+                ),
+                "Failed to create vertex buffer"
+            );
+
+            expect!(vertex_buffer, "unable to create vertex buffer")
+        }
     }
-}
 
-fn create_vertex_buffer(device: &IDirect3DDevice9, vertices: usize) -> IDirect3DVertexBuffer9 {
-    unsafe {
-        let mut vertex_buffer: Option<IDirect3DVertexBuffer9> = None;
-        expect!(
-            device.CreateVertexBuffer(
-                (vertices * std::mem::size_of::<GpuVertex>()) as u32,
-                (D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY) as _,
-                FVF_CUSTOMVERTEX,
-                D3DPOOL_DEFAULT,
-                &mut vertex_buffer,
-                std::ptr::null_mut::<HANDLE>()
-            ),
-            "Failed to create vertex buffer"
-        );
+    fn create_index_buffer(device: &IDirect3DDevice9, indices: usize) -> IDirect3DIndexBuffer9 {
+        unsafe {
+            let mut index_buffer: Option<IDirect3DIndexBuffer9> = None;
+            expect!(
+                device.CreateIndexBuffer(
+                    (indices * std::mem::size_of::<u32>()) as u32,
+                    (D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY) as _,
+                    D3DFMT_INDEX32,
+                    D3DPOOL_DEFAULT,
+                    &mut index_buffer,
+                    std::ptr::null_mut::<HANDLE>()
+                ),
+                "Failed to create index buffer"
+            );
 
-        expect!(vertex_buffer, "unable to create vertex buffer")
+            expect!(index_buffer, "unable to create index buffer")
+        }
     }
-}
 
-fn update_vertex_buffer(mesh: &GpuMesh, vtx: &mut IDirect3DVertexBuffer9) {
-    unsafe {
-        let mut buffer: *mut GpuVertex = std::mem::zeroed();
+    pub fn update_vertex_buffer(&mut self, device: &IDirect3DDevice9, vertices: &[GpuVertex]) {
+        unsafe {
+            let buf_len = vertices.len();
 
-        expect!(
-            vtx.Lock(
-                0,
-                mesh.vertices.len() as u32 * std::mem::size_of::<GpuVertex>() as u32,
-                std::mem::transmute(&mut buffer),
-                D3DLOCK_DISCARD as _
-            ),
-            "unable to lock vertex buffer"
-        );
+            if self.vtx_size < buf_len {
+                let new_size = buf_len + 1024;
+                self.vtx = Self::create_vertex_buffer(device, new_size);
+                self.vtx_size = new_size;
+            }
 
-        let buffer = std::slice::from_raw_parts_mut(buffer, mesh.vertices.len() as _);
+            let vtx = &mut self.vtx;
 
-        buffer.copy_from_slice(mesh.vertices.as_slice());
+            let mut buffer: *mut GpuVertex = std::mem::zeroed();
 
-        expect!(vtx.Unlock(), "unable to unlock vtx buffer");
+            expect!(
+                vtx.Lock(
+                    0,
+                    vertices.len() as u32 * std::mem::size_of::<GpuVertex>() as u32,
+                    std::mem::transmute(&mut buffer),
+                    D3DLOCK_DISCARD as _
+                ),
+                "unable to lock vertex buffer"
+            );
+
+            let buffer = std::slice::from_raw_parts_mut(buffer, vertices.len() as _);
+
+            buffer.copy_from_slice(vertices);
+
+            expect!(vtx.Unlock(), "unable to unlock vtx buffer");
+        }
     }
-}
 
-fn create_index_buffer(device: &IDirect3DDevice9, indices: usize) -> IDirect3DIndexBuffer9 {
-    unsafe {
-        let mut index_buffer: Option<IDirect3DIndexBuffer9> = None;
-        expect!(
-            device.CreateIndexBuffer(
-                (indices * std::mem::size_of::<u32>()) as u32,
-                (D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY) as _,
-                D3DFMT_INDEX32,
-                D3DPOOL_DEFAULT,
-                &mut index_buffer,
-                std::ptr::null_mut::<HANDLE>()
-            ),
-            "Failed to create index buffer"
-        );
+    pub fn update_index_buffer(&mut self, device: &IDirect3DDevice9, indices: &[u32]) {
+        unsafe {
+            let buf_len = indices.len();
 
-        expect!(index_buffer, "unable to create index buffer")
-    }
-}
+            if self.idx_size < buf_len {
+                let new_size = buf_len + 1024;
+                self.idx = Self::create_index_buffer(device, new_size);
+                self.idx_size = new_size;
+            }
 
-fn update_index_buffer(mesh: &GpuMesh, idx: &mut IDirect3DIndexBuffer9) {
-    unsafe {
-        let mut buffer: *mut u32 = std::mem::zeroed();
+            let idx = &mut self.idx;
 
-        expect!(
-            idx.Lock(
-                0,
-                mesh.indices.len() as u32 * std::mem::size_of::<u32>() as u32,
-                std::mem::transmute(&mut buffer),
-                D3DLOCK_DISCARD as _
-            ),
-            "unable to lock index buffer"
-        );
+            let mut buffer: *mut u32 = std::mem::zeroed();
 
-        let buffer = std::slice::from_raw_parts_mut(buffer, mesh.indices.len() as _);
+            expect!(
+                idx.Lock(
+                    0,
+                    indices.len() as u32 * std::mem::size_of::<u32>() as u32,
+                    std::mem::transmute(&mut buffer),
+                    D3DLOCK_DISCARD as _
+                ),
+                "unable to lock index buffer"
+            );
 
-        buffer.copy_from_slice(mesh.indices.as_slice());
+            let buffer = std::slice::from_raw_parts_mut(buffer, indices.len() as _);
 
-        expect!(idx.Unlock(), "unable to unlock idx buffer");
+            buffer.copy_from_slice(indices);
+
+            expect!(idx.Unlock(), "unable to unlock idx buffer");
+        }
     }
 }

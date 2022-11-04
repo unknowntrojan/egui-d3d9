@@ -204,6 +204,10 @@ fn ui(ctx: &Context, i: &mut i32) {
             ctx.memory_ui(ui);
         });
 
+        egui::Window::new("stuff").show(ctx, |ui| unsafe {
+            ctx.inspection_ui(ui);
+        });
+
         ctx.debug_painter().rect(
             Rect {
                 min: Pos2::new(200.0, 200.0),

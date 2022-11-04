@@ -10,7 +10,7 @@ use windows::Win32::{
 
 use crate::{
     inputman::InputManager,
-    mesh::{Buffers, GpuMesh, GpuVertex},
+    mesh::{Buffers, GpuVertex, MeshDescriptor},
     state::DxState,
     texman::TextureManager,
 };
@@ -23,6 +23,9 @@ pub struct EguiDx9<T> {
     // get it? tEx-man? tax-man? no?
     tex_man: TextureManager,
     ctx: Context,
+    buffers: Option<Buffers>,
+    last_idx_capacity: usize,
+    last_vtx_capacity: usize,
 }
 
 impl<T> EguiDx9<T> {
@@ -34,13 +37,16 @@ impl<T> EguiDx9<T> {
             tex_man: TextureManager::new(),
             input_man: InputManager::new(hwnd),
             ctx: Context::default(),
+            buffers: None,
+            last_idx_capacity: 0,
+            last_vtx_capacity: 0,
         }
     }
 
     pub fn present(&mut self, dev: &IDirect3DDevice9) {
         // back up our state so we don't mess with the game and the game doesn't mess with us.
         // i actually had the idea to use BeginStateBlock and co. to "cache" the state we set every frame,
-        // and just re-applying it everytime. this has a very low performance impact, so it doesn't matter.
+        // and just re-applying it everytime. just setting this manually takes around 50 microseconds on my machine.
         let _state = DxState::setup(dev, self.get_viewport());
 
         let output = self.ctx.run(self.input_man.collect_input(), |ctx| {
@@ -64,34 +70,59 @@ impl<T> EguiDx9<T> {
             return;
         }
 
-        let prims: Vec<GpuMesh> = self
+        let mut vertices: Vec<GpuVertex> = Vec::with_capacity(self.last_vtx_capacity + 512);
+        let mut indices: Vec<u32> = Vec::with_capacity(self.last_idx_capacity + 512);
+
+        let prims: Vec<MeshDescriptor> = self
             .ctx
             .tessellate(output.shapes)
             .into_iter()
             .filter_map(|prim| {
                 if let Primitive::Mesh(mesh) = prim.primitive {
-                    GpuMesh::from_mesh(mesh, prim.clip_rect)
+                    // most definitely not the rusty way to do this.
+                    // it's ugly, but its efficient.
+                    if let Some((gpumesh, verts, idxs)) =
+                        MeshDescriptor::from_mesh(mesh, prim.clip_rect)
+                    {
+                        vertices.extend_from_slice(verts.as_slice());
+                        indices.extend_from_slice(idxs.as_slice());
+
+                        Some(gpumesh)
+                    } else {
+                        None
+                    }
                 } else {
                     panic!("paint callbacks not supported")
                 }
             })
             .collect();
+        // rewrite the buffer stuff to persist the buffer and simply lock it each frame,
+        // maybe try and upscale the buffer size to the nearest 16k boundary or something.
 
-        // instead of only making one buffer and updating it, we could merge all meshes.
-        // we could then compute an offset into the buffer and apply new scissor rects
-        // etc. simply by knowing which index we're at.
-        let (total_vertices, total_indices) = prims.iter().fold((0, 0), |acc, mesh| {
-            (
-                std::cmp::max(acc.0, mesh.vertices.len()),
-                std::cmp::max(acc.1, mesh.indices.len()),
-            )
-        });
+        if self.buffers.is_none() {
+            self.buffers = Some(Buffers::create_buffers(dev, vertices.len(), indices.len()));
+        }
 
-        let mut buffers = Buffers::create_buffers(dev, total_vertices, total_indices);
+        self.last_vtx_capacity = vertices.len();
+        self.last_idx_capacity = indices.len();
 
-        prims.iter().for_each(|mesh: &GpuMesh| unsafe {
-            buffers.update_buffers(mesh);
+        let buffers = self.buffers.as_mut().unwrap();
+        buffers.update_vertex_buffer(dev, &vertices);
+        buffers.update_index_buffer(dev, &indices);
 
+        unsafe {
+            expect!(
+                dev.SetStreamSource(0, &buffers.vtx, 0, std::mem::size_of::<GpuVertex>() as _),
+                "unable to set vertex stream source"
+            );
+
+            expect!(dev.SetIndices(&buffers.idx), "unable to set index buffer");
+        }
+
+        let mut our_vtx_idx: usize = 0;
+        let mut our_idx_idx: usize = 0;
+
+        prims.iter().for_each(|mesh: &MeshDescriptor| unsafe {
             expect!(
                 dev.SetScissorRect(&RECT {
                     left: mesh.clip.left() as _,
@@ -107,23 +138,19 @@ impl<T> EguiDx9<T> {
             expect!(dev.SetTexture(0, texture), "unable to set texture");
 
             expect!(
-                dev.SetStreamSource(0, &buffers.vtx, 0, std::mem::size_of::<GpuVertex>() as _),
-                "unable to set vertex stream source"
-            );
-
-            expect!(dev.SetIndices(&buffers.idx), "unable to set index buffer");
-
-            expect!(
                 dev.DrawIndexedPrimitive(
                     D3DPT_TRIANGLELIST,
+                    our_vtx_idx as _,
                     0,
-                    0,
-                    mesh.vertices.len() as _,
-                    0,
-                    (mesh.indices.len() / 3usize) as _
+                    mesh.vertices as _,
+                    our_idx_idx as _,
+                    (mesh.indices / 3usize) as _
                 ),
                 "unable to draw indexed prims"
             );
+
+            our_vtx_idx = our_vtx_idx + mesh.vertices;
+            our_idx_idx = our_idx_idx + mesh.indices;
         });
 
         if !output.textures_delta.is_empty() {
