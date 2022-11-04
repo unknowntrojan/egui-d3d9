@@ -65,7 +65,7 @@ fn hk_present(
         INIT.call_once(|| {
             let window = FindWindowA(s!("Valve001"), PCSTR(std::ptr::null()));
 
-            APP = Some(EguiDx9::init(window, ui, 0));
+            APP = Some(EguiDx9::init(&dev, window, ui, 0));
 
             OLD_WND_PROC = Some(transmute(SetWindowLongPtrA(
                 window,

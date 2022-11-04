@@ -23,13 +23,18 @@ pub struct EguiDx9<T> {
     // get it? tEx-man? tax-man? no?
     tex_man: TextureManager,
     ctx: Context,
-    buffers: Option<Buffers>,
+    buffers: Buffers,
     last_idx_capacity: usize,
     last_vtx_capacity: usize,
 }
 
 impl<T> EguiDx9<T> {
-    pub fn init(hwnd: HWND, ui_fn: impl FnMut(&Context, &mut T) + 'static, ui_state: T) -> Self {
+    pub fn init(
+        dev: &IDirect3DDevice9,
+        hwnd: HWND,
+        ui_fn: impl FnMut(&Context, &mut T) + 'static,
+        ui_state: T,
+    ) -> Self {
         Self {
             ui_fn: Box::new(ui_fn),
             ui_state,
@@ -37,7 +42,7 @@ impl<T> EguiDx9<T> {
             tex_man: TextureManager::new(),
             input_man: InputManager::new(hwnd),
             ctx: Context::default(),
-            buffers: None,
+            buffers: Buffers::create_buffers(dev, 16384, 16384),
             last_idx_capacity: 0,
             last_vtx_capacity: 0,
         }
@@ -97,24 +102,27 @@ impl<T> EguiDx9<T> {
             })
             .collect();
 
-        if self.buffers.is_none() {
-            self.buffers = Some(Buffers::create_buffers(dev, vertices.len(), indices.len()));
-        }
-
         self.last_vtx_capacity = vertices.len();
         self.last_idx_capacity = indices.len();
 
-        let buffers = self.buffers.as_mut().unwrap();
-        buffers.update_vertex_buffer(dev, &vertices);
-        buffers.update_index_buffer(dev, &indices);
+        self.buffers.update_vertex_buffer(dev, &vertices);
+        self.buffers.update_index_buffer(dev, &indices);
 
         unsafe {
             expect!(
-                dev.SetStreamSource(0, &buffers.vtx, 0, std::mem::size_of::<GpuVertex>() as _),
+                dev.SetStreamSource(
+                    0,
+                    &self.buffers.vtx,
+                    0,
+                    std::mem::size_of::<GpuVertex>() as _
+                ),
                 "unable to set vertex stream source"
             );
 
-            expect!(dev.SetIndices(&buffers.idx), "unable to set index buffer");
+            expect!(
+                dev.SetIndices(&self.buffers.idx),
+                "unable to set index buffer"
+            );
         }
 
         let mut our_vtx_idx: usize = 0;
