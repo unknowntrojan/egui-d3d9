@@ -96,8 +96,6 @@ impl<T> EguiDx9<T> {
                 }
             })
             .collect();
-        // rewrite the buffer stuff to persist the buffer and simply lock it each frame,
-        // maybe try and upscale the buffer size to the nearest 16k boundary or something.
 
         if self.buffers.is_none() {
             self.buffers = Some(Buffers::create_buffers(dev, vertices.len(), indices.len()));
