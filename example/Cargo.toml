@@ -3,7 +3,7 @@ name = "example-wnd"
 version = "0.1.0"
 edition = "2021"
 authors = ["unknowntrojan", "sy1ntexx"]
-description = "Example dll for egui d3d11 showcase."
+description = "Example dll for egui d3d9 showcase."
 license = "MIT"
 publish = false
 
