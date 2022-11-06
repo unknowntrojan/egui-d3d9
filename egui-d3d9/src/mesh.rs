@@ -1,6 +1,6 @@
 use egui::{Color32, Mesh, Pos2, Rect, TextureId};
 use windows::Win32::{
-    Foundation::HANDLE,
+    Foundation::{HANDLE, RECT},
     Graphics::Direct3D9::{
         IDirect3DDevice9, IDirect3DIndexBuffer9, IDirect3DVertexBuffer9, D3DFMT_INDEX32,
         D3DLOCK_DISCARD, D3DPOOL_DEFAULT, D3DUSAGE_DYNAMIC, D3DUSAGE_WRITEONLY,
@@ -35,9 +35,9 @@ impl From<Color32> for VertexColor {
 }
 
 pub struct MeshDescriptor {
-    pub indices: usize,
     pub vertices: usize,
-    pub clip: Rect,
+    pub indices: usize,
+    pub clip: RECT,
     pub texture_id: TextureId,
 }
 
@@ -58,10 +58,15 @@ impl MeshDescriptor {
 
             Some((
                 Self {
-                    texture_id: mesh.texture_id,
-                    indices: mesh.indices.len(),
-                    clip: scissors,
                     vertices: vertices.len(),
+                    indices: mesh.indices.len(),
+                    clip: RECT {
+                        left: scissors.left() as _,
+                        top: scissors.top() as _,
+                        right: scissors.right() as _,
+                        bottom: scissors.bottom() as _,
+                    },
+                    texture_id: mesh.texture_id,
                 },
                 vertices,
                 mesh.indices,

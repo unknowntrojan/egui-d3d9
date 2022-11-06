@@ -18,7 +18,7 @@ use crate::{
 pub struct EguiDx9<T> {
     ui_fn: Box<dyn FnMut(&Context, &mut T) + 'static>,
     ui_state: T,
-    hwnd: OnceCell<HWND>,
+    hwnd: HWND,
     input_man: InputManager,
     // get it? tEx-man? tax-man? no?
     tex_man: TextureManager,
@@ -38,7 +38,7 @@ impl<T> EguiDx9<T> {
         Self {
             ui_fn: Box::new(ui_fn),
             ui_state,
-            hwnd: OnceCell::from(hwnd),
+            hwnd,
             tex_man: TextureManager::new(),
             input_man: InputManager::new(hwnd),
             ctx: Context::default(),
@@ -129,15 +129,7 @@ impl<T> EguiDx9<T> {
         let mut our_idx_idx: usize = 0;
 
         prims.iter().for_each(|mesh: &MeshDescriptor| unsafe {
-            expect!(
-                dev.SetScissorRect(&RECT {
-                    left: mesh.clip.left() as _,
-                    top: mesh.clip.top() as _,
-                    right: mesh.clip.right() as _,
-                    bottom: mesh.clip.bottom() as _,
-                }),
-                "unable to set scissor rect"
-            );
+            expect!(dev.SetScissorRect(&mesh.clip), "unable to set scissor rect");
 
             let texture = self.tex_man.get_by_id(mesh.texture_id);
 
@@ -176,10 +168,7 @@ impl<T> EguiDx9<T> {
     fn get_screen_size(&self) -> (f32, f32) {
         let mut rect = RECT::default();
         unsafe {
-            GetClientRect(
-                *expect!(self.hwnd.get(), "You need to call init first"),
-                &mut rect,
-            );
+            GetClientRect(self.hwnd, &mut rect);
         }
         (
             (rect.right - rect.left) as f32,
