@@ -1,5 +1,3 @@
-use std::cell::OnceCell;
-
 use clipboard::{windows_clipboard::WindowsClipboardContext, ClipboardProvider};
 use egui::{epaint::Primitive, Context};
 use windows::Win32::{
@@ -35,6 +33,10 @@ impl<T> EguiDx9<T> {
         ui_fn: impl FnMut(&Context, &mut T) + 'static,
         ui_state: T,
     ) -> Self {
+        if hwnd.0 == 0 {
+            panic!("invalid hwnd specified in egui init");
+        }
+
         Self {
             ui_fn: Box::new(ui_fn),
             ui_state,

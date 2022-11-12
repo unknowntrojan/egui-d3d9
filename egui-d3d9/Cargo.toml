@@ -1,6 +1,6 @@
 [package]
 name = "egui-d3d9"
-version = "0.1.1"
+version = "0.1.2"
 # input & most of mesh processing as well as general structure copied from sy1ntexx's egui-d3d11
 authors = ["unknowntrojan"]
 description = "D3D9 backend for egui"
