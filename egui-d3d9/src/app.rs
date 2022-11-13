@@ -17,6 +17,7 @@ pub struct EguiDx9<T> {
     ui_fn: Box<dyn FnMut(&Context, &mut T) + 'static>,
     ui_state: T,
     hwnd: HWND,
+    reactive: bool,
     input_man: InputManager,
     // get it? tEx-man? tax-man? no?
     tex_man: TextureManager,
@@ -28,11 +29,21 @@ pub struct EguiDx9<T> {
 }
 
 impl<T> EguiDx9<T> {
+    ///
+    /// initialize the backend.
+    ///
+    ///
+    /// if you are using this purely as a UI, you can set `reactive` to true.
+    /// this causes us to only re-draw the menu once something changes.
+    ///
+    /// the menu doesn't always catch these changes, so only use this if you need to.
+    ///
     pub fn init(
         dev: &IDirect3DDevice9,
         hwnd: HWND,
         ui_fn: impl FnMut(&Context, &mut T) + 'static,
         ui_state: T,
+        reactive: bool,
     ) -> Self {
         if hwnd.0 == 0 {
             panic!("invalid hwnd specified in egui init");
@@ -42,6 +53,7 @@ impl<T> EguiDx9<T> {
             ui_fn: Box::new(ui_fn),
             ui_state,
             hwnd,
+            reactive,
             tex_man: TextureManager::new(),
             input_man: InputManager::new(hwnd),
             ctx: Context::default(),
@@ -80,7 +92,7 @@ impl<T> EguiDx9<T> {
         }
 
         // we only need to update the buffers if we are actually changing something
-        if output.repaint_after.is_zero() {
+        if output.repaint_after.is_zero() || !self.reactive {
             let mut vertices: Vec<GpuVertex> = Vec::with_capacity(self.last_vtx_capacity + 512);
             let mut indices: Vec<u32> = Vec::with_capacity(self.last_idx_capacity + 512);
 
