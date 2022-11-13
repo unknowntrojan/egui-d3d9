@@ -22,6 +22,7 @@ pub struct EguiDx9<T> {
     tex_man: TextureManager,
     ctx: Context,
     buffers: Buffers,
+    prims: Vec<MeshDescriptor>,
     last_idx_capacity: usize,
     last_vtx_capacity: usize,
 }
@@ -45,6 +46,7 @@ impl<T> EguiDx9<T> {
             input_man: InputManager::new(hwnd),
             ctx: Context::default(),
             buffers: Buffers::create_buffers(dev, 16384, 16384),
+            prims: Vec::new(),
             last_idx_capacity: 0,
             last_vtx_capacity: 0,
         }
@@ -77,38 +79,41 @@ impl<T> EguiDx9<T> {
             return;
         }
 
-        let mut vertices: Vec<GpuVertex> = Vec::with_capacity(self.last_vtx_capacity + 512);
-        let mut indices: Vec<u32> = Vec::with_capacity(self.last_idx_capacity + 512);
+        // we only need to update the buffers if we are actually changing something
+        if output.repaint_after.is_zero() {
+            let mut vertices: Vec<GpuVertex> = Vec::with_capacity(self.last_vtx_capacity + 512);
+            let mut indices: Vec<u32> = Vec::with_capacity(self.last_idx_capacity + 512);
 
-        let prims: Vec<MeshDescriptor> = self
-            .ctx
-            .tessellate(output.shapes)
-            .into_iter()
-            .filter_map(|prim| {
-                if let Primitive::Mesh(mesh) = prim.primitive {
-                    // most definitely not the rusty way to do this.
-                    // it's ugly, but its efficient.
-                    if let Some((gpumesh, verts, idxs)) =
-                        MeshDescriptor::from_mesh(mesh, prim.clip_rect)
-                    {
-                        vertices.extend_from_slice(verts.as_slice());
-                        indices.extend_from_slice(idxs.as_slice());
+            self.prims = self
+                .ctx
+                .tessellate(output.shapes)
+                .into_iter()
+                .filter_map(|prim| {
+                    if let Primitive::Mesh(mesh) = prim.primitive {
+                        // most definitely not the rusty way to do this.
+                        // it's ugly, but its efficient.
+                        if let Some((gpumesh, verts, idxs)) =
+                            MeshDescriptor::from_mesh(mesh, prim.clip_rect)
+                        {
+                            vertices.extend_from_slice(verts.as_slice());
+                            indices.extend_from_slice(idxs.as_slice());
 
-                        Some(gpumesh)
+                            Some(gpumesh)
+                        } else {
+                            None
+                        }
                     } else {
-                        None
+                        panic!("paint callbacks not supported")
                     }
-                } else {
-                    panic!("paint callbacks not supported")
-                }
-            })
-            .collect();
+                })
+                .collect();
 
-        self.last_vtx_capacity = vertices.len();
-        self.last_idx_capacity = indices.len();
+            self.last_vtx_capacity = vertices.len();
+            self.last_idx_capacity = indices.len();
 
-        self.buffers.update_vertex_buffer(dev, &vertices);
-        self.buffers.update_index_buffer(dev, &indices);
+            self.buffers.update_vertex_buffer(dev, &vertices);
+            self.buffers.update_index_buffer(dev, &indices);
+        }
 
         unsafe {
             expect!(
@@ -130,7 +135,7 @@ impl<T> EguiDx9<T> {
         let mut our_vtx_idx: usize = 0;
         let mut our_idx_idx: usize = 0;
 
-        prims.iter().for_each(|mesh: &MeshDescriptor| unsafe {
+        self.prims.iter().for_each(|mesh: &MeshDescriptor| unsafe {
             expect!(dev.SetScissorRect(&mesh.clip), "unable to set scissor rect");
 
             let texture = self.tex_man.get_by_id(mesh.texture_id);
