@@ -65,11 +65,6 @@ impl<T> EguiDx9<T> {
     }
 
     pub fn present(&mut self, dev: &IDirect3DDevice9) {
-        // back up our state so we don't mess with the game and the game doesn't mess with us.
-        // i actually had the idea to use BeginStateBlock and co. to "cache" the state we set every frame,
-        // and just re-applying it everytime. just setting this manually takes around 50 microseconds on my machine.
-        let _state = DxState::setup(dev, self.get_viewport());
-
         let output = self.ctx.run(self.input_man.collect_input(), |ctx| {
             // safe. present will never run in parallel.
             (self.ui_fn)(ctx, &mut self.ui_state)
@@ -127,6 +122,11 @@ impl<T> EguiDx9<T> {
             self.buffers.update_index_buffer(dev, &indices);
         }
 
+        // back up our state so we don't mess with the game and the game doesn't mess with us.
+        // i actually had the idea to use BeginStateBlock and co. to "cache" the state we set every frame,
+        // and just re-applying it everytime. just setting this manually takes around 50 microseconds on my machine.
+        let _state = DxState::setup(dev, self.get_viewport());
+
         unsafe {
             expect!(
                 dev.SetStreamSource(
@@ -183,7 +183,6 @@ impl<T> EguiDx9<T> {
 }
 
 impl<T> EguiDx9<T> {
-    #[inline]
     fn get_screen_size(&self) -> (f32, f32) {
         let mut rect = RECT::default();
         unsafe {
@@ -195,7 +194,6 @@ impl<T> EguiDx9<T> {
         )
     }
 
-    #[inline]
     fn get_viewport(&self) -> D3DVIEWPORT9 {
         let (w, h) = self.get_screen_size();
         D3DVIEWPORT9 {

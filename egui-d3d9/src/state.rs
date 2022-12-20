@@ -82,21 +82,21 @@ impl Drop for DxState {
         // restore the previous state
         unsafe {
             expect!(
-                self.original_state.Apply(),
-                "unable to re-apply captured state"
-            );
-
-            expect!(
                 self.dev.SetTransform(D3DTS_WORLD, &self.original_world),
-                "unable to backup world matrix"
+                "unable to reset world matrix"
             );
             expect!(
                 self.dev.SetTransform(D3DTS_VIEW, &self.original_view),
-                "unable to backup view matrix"
+                "unable to reset view matrix"
             );
             expect!(
                 self.dev.SetTransform(D3DTS_PROJECTION, &self.original_proj),
-                "unable to backup projection matrix"
+                "unable to reset projection matrix"
+            );
+
+            expect!(
+                self.original_state.Apply(),
+                "unable to re-apply captured state"
             );
         }
     }
@@ -161,29 +161,29 @@ fn setup_state(
         // set up render state
         dev.SetRenderState(D3DRS_FILLMODE, D3DFILL_SOLID.0 as _)?;
         dev.SetRenderState(D3DRS_SHADEMODE, D3DSHADE_GOURAUD.0 as _)?;
-        dev.SetRenderState(D3DRS_ZENABLE, false.into())?;
-        dev.SetRenderState(D3DRS_ZWRITEENABLE, false.into())?;
-        dev.SetRenderState(D3DRS_ALPHATESTENABLE, false.into())?;
+        dev.SetRenderState(D3DRS_ZENABLE, false as _)?;
+        dev.SetRenderState(D3DRS_ZWRITEENABLE, false as _)?;
+        dev.SetRenderState(D3DRS_ALPHATESTENABLE, false as _)?;
         dev.SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE.0 as _)?;
-        dev.SetRenderState(D3DRS_ALPHABLENDENABLE, true.into())?;
+        dev.SetRenderState(D3DRS_ALPHABLENDENABLE, true as _)?;
         dev.SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD.0 as _)?;
         dev.SetRenderState(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA.0 as _)?;
         dev.SetRenderState(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA.0 as _)?;
-        dev.SetRenderState(D3DRS_SEPARATEALPHABLENDENABLE, true.into())?;
+        dev.SetRenderState(D3DRS_SEPARATEALPHABLENDENABLE, true as _)?;
         dev.SetRenderState(D3DRS_BLENDOPALPHA, D3DBLENDOP_ADD.0 as _)?;
         dev.SetRenderState(D3DRS_SRCBLENDALPHA, D3DBLEND_ONE.0 as _)?;
         dev.SetRenderState(D3DRS_DESTBLENDALPHA, D3DBLEND_INVSRCALPHA.0 as _)?;
-        dev.SetRenderState(D3DRS_SCISSORTESTENABLE, true.into())?;
-        dev.SetRenderState(D3DRS_FOGENABLE, false.into())?;
-        dev.SetRenderState(D3DRS_RANGEFOGENABLE, false.into())?;
-        dev.SetRenderState(D3DRS_SPECULARENABLE, false.into())?;
-        dev.SetRenderState(D3DRS_STENCILENABLE, false.into())?;
-        dev.SetRenderState(D3DRS_CLIPPING, true.into())?;
-        dev.SetRenderState(D3DRS_LIGHTING, false.into())?;
+        dev.SetRenderState(D3DRS_SCISSORTESTENABLE, true as _)?;
+        dev.SetRenderState(D3DRS_FOGENABLE, false as _)?;
+        dev.SetRenderState(D3DRS_RANGEFOGENABLE, false as _)?;
+        dev.SetRenderState(D3DRS_SPECULARENABLE, false as _)?;
+        dev.SetRenderState(D3DRS_STENCILENABLE, false as _)?;
+        dev.SetRenderState(D3DRS_CLIPPING, true as _)?;
+        dev.SetRenderState(D3DRS_LIGHTING, false as _)?;
         dev.SetRenderState(D3DRS_TEXTUREFACTOR, 0xFFFFFFFF)?;
         dev.SetRenderState(D3DRS_COLORWRITEENABLE, 0xFFFFFFFF)?;
-        dev.SetRenderState(D3DRS_SRGBWRITEENABLE, false.into())?;
-        dev.SetRenderState(D3DRS_LASTPIXEL, true.into())?;
+        dev.SetRenderState(D3DRS_SRGBWRITEENABLE, false as _)?;
+        dev.SetRenderState(D3DRS_LASTPIXEL, true as _)?;
 
         // set up texture stages
         dev.SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_MODULATE.0 as _)?;
