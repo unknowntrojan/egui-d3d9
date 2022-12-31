@@ -65,7 +65,7 @@ fn hk_present(
         INIT.call_once(|| {
             let window = FindWindowA(s!("Valve001"), PCSTR(std::ptr::null()));
 
-            APP = Some(EguiDx9::init(&dev, window, ui, 0));
+            APP = Some(EguiDx9::init(&dev, window, ui, 0, true));
 
             OLD_WND_PROC = Some(transmute(SetWindowLongPtrA(
                 window,
@@ -191,7 +191,7 @@ fn ui(ctx: &Context, i: &mut i32) {
                 let tex = Box::leak(Box::new(ctx.load_texture(
                     "logo",
                     egui_extras::image::load_image_bytes(include_bytes!("logo.bmp")).unwrap(),
-                    egui::TextureFilter::Linear,
+                    egui::TextureOptions::LINEAR,
                 )));
 
                 IMG = tex.id();
