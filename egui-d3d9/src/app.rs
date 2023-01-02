@@ -166,8 +166,8 @@ impl<T> EguiDx9<T> {
                 "unable to draw indexed prims"
             );
 
-            our_vtx_idx = our_vtx_idx + mesh.vertices;
-            our_idx_idx = our_idx_idx + mesh.indices;
+            our_vtx_idx += mesh.vertices;
+            our_idx_idx += mesh.indices;
         });
 
         if !output.textures_delta.is_empty() {
