@@ -192,7 +192,7 @@ impl Buffers {
                 idx.Lock(
                     0,
                     indices.len() as u32 * std::mem::size_of::<u32>() as u32,
-                    std::mem::transmute(&mut buffer),
+                    &mut buffer as *mut *mut u32 as *mut *mut std::ffi::c_void,
                     D3DLOCK_DISCARD as _
                 ),
                 "unable to lock index buffer"

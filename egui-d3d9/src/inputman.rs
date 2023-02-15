@@ -150,9 +150,9 @@ impl InputManager {
 
                 self.events.push(Event::PointerButton {
                     pos: get_pos(lparam),
-                    button: if (wparam as u32) >> 16 & XBUTTON1.0 != 0 {
+                    button: if (wparam as u32) >> 16 & (XBUTTON1 as u32) != 0 {
                         PointerButton::Extra1
-                    } else if (wparam as u32) >> 16 & XBUTTON2.0 != 0 {
+                    } else if (wparam as u32) >> 16 & (XBUTTON2 as u32) != 0 {
                         PointerButton::Extra2
                     } else {
                         unreachable!()
@@ -168,9 +168,9 @@ impl InputManager {
 
                 self.events.push(Event::PointerButton {
                     pos: get_pos(lparam),
-                    button: if (wparam as u32) >> 16 & XBUTTON1.0 != 0 {
+                    button: if (wparam as u32) >> 16 & (XBUTTON1 as u32) != 0 {
                         PointerButton::Extra1
-                    } else if (wparam as u32) >> 16 & XBUTTON2.0 != 0 {
+                    } else if (wparam as u32) >> 16 & (XBUTTON2 as u32) != 0 {
                         PointerButton::Extra2
                     } else {
                         unreachable!()
@@ -239,6 +239,7 @@ impl InputManager {
                         pressed: true,
                         modifiers,
                         key,
+                        repeat: lparam & 0b1111_1111_1111_1111_0000_0000_0000_0000 > 0,
                     });
                 }
                 InputResult::Key
@@ -252,6 +253,7 @@ impl InputManager {
                         pressed: false,
                         modifiers,
                         key,
+                        repeat: false,
                     });
                 }
                 InputResult::Key

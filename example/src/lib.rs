@@ -1,10 +1,10 @@
 #![allow(warnings)]
-use detour::static_detour;
 use egui::{
     Align2, Color32, Context, FontData, FontDefinitions, FontFamily, FontId, FontTweak, Key,
     Modifiers, Pos2, Rect, RichText, ScrollArea, Slider, Stroke, TextureId, Vec2, Widget,
 };
 use egui_d3d9::EguiDx9;
+use retour::static_detour;
 use std::{
     intrinsics::transmute,
     sync::{Arc, Once},
@@ -144,20 +144,22 @@ fn ui(ctx: &Context, i: &mut i32) {
 
             ui.label(RichText::new(format!("I: {}", *i)).color(Color32::LIGHT_RED));
 
-            let input = ctx.input().pointer.clone();
+            let input = ctx.input(|input| input.pointer.clone());
             ui.label(format!(
                 "X1: {} X2: {}",
                 input.button_down(egui::PointerButton::Extra1),
                 input.button_down(egui::PointerButton::Extra2)
             ));
 
-            let mods = ui.input().modifiers;
+            let mods = ui.input(|input| input.modifiers);
             ui.label(format!(
                 "Ctrl: {} Shift: {} Alt: {}",
                 mods.ctrl, mods.shift, mods.alt
             ));
 
-            if ui.input().modifiers.matches(Modifiers::CTRL) && ui.input().key_pressed(Key::R) {
+            if ui.input(|input| {
+                input.modifiers.matches(Modifiers::CTRL) && input.key_pressed(Key::R)
+            }) {
                 println!("Pressed");
             }
 
@@ -177,7 +179,7 @@ fn ui(ctx: &Context, i: &mut i32) {
 
             ui.label(format!(
                 "{:?}",
-                &ui.input().pointer.button_down(egui::PointerButton::Primary)
+                &ui.input(|input| input.pointer.button_down(egui::PointerButton::Primary))
             ));
             if ui.button("You can't click me yet").clicked() {
                 *i += 1;

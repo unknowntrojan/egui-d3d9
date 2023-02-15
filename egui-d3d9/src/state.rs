@@ -1,7 +1,7 @@
-use windows::Win32::{
-    Graphics::{
-        Direct3D::{D3DMATRIX, D3DMATRIX_0},
-        Direct3D9::{
+use windows::{
+    Foundation::Numerics::Matrix4x4,
+    Win32::{
+        Graphics::Direct3D9::{
             IDirect3DDevice9, IDirect3DStateBlock9, IDirect3DSurface9, D3DBACKBUFFER_TYPE_MONO,
             D3DBLENDOP_ADD, D3DBLEND_INVSRCALPHA, D3DBLEND_ONE, D3DBLEND_SRCALPHA, D3DCULL_NONE,
             D3DFILL_SOLID, D3DRS_ALPHABLENDENABLE, D3DRS_ALPHATESTENABLE, D3DRS_BLENDOP,
@@ -16,17 +16,17 @@ use windows::Win32::{
             D3DTSS_ALPHAOP, D3DTSS_COLORARG0, D3DTSS_COLORARG1, D3DTSS_COLORARG2, D3DTSS_COLOROP,
             D3DTS_PROJECTION, D3DTS_VIEW, D3DTS_WORLD, D3DVIEWPORT9,
         },
+        System::SystemServices::{D3DTA_CURRENT, D3DTA_DIFFUSE, D3DTA_TEXTURE},
     },
-    System::SystemServices::{D3DTA_CURRENT, D3DTA_DIFFUSE, D3DTA_TEXTURE},
 };
 
 use crate::mesh::FVF_CUSTOMVERTEX;
 
 pub struct DxState {
     original_state: IDirect3DStateBlock9,
-    original_world: D3DMATRIX,
-    original_view: D3DMATRIX,
-    original_proj: D3DMATRIX,
+    original_world: Matrix4x4,
+    original_view: Matrix4x4,
+    original_proj: Matrix4x4,
     dev: IDirect3DDevice9,
 }
 
@@ -46,9 +46,9 @@ impl DxState {
                 "unable to capture dx state backup"
             );
 
-            let mut original_world: D3DMATRIX = Default::default();
-            let mut original_view: D3DMATRIX = Default::default();
-            let mut original_proj: D3DMATRIX = Default::default();
+            let mut original_world: Matrix4x4 = Default::default();
+            let mut original_view: Matrix4x4 = Default::default();
+            let mut original_proj: Matrix4x4 = Default::default();
 
             expect!(
                 dev.GetTransform(D3DTS_WORLD, &mut original_world),
@@ -123,35 +123,31 @@ fn setup_state(
         let t = 0.5;
         let b = viewport.Height as f32 + 0.5;
 
-        let mat_ident = D3DMATRIX {
-            Anonymous: D3DMATRIX_0 {
-                m: [
-                    1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
-                ],
-            },
+        let mat_ident = Matrix4x4 {
+            M11: 1.0,
+            M22: 1.0,
+            M33: 1.0,
+            M44: 1.0,
+            ..Default::default()
         };
 
-        let mat_proj = D3DMATRIX {
-            Anonymous: D3DMATRIX_0 {
-                m: [
-                    2.0 / (r - l),
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    2.0 / (t - b),
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.5,
-                    0.0,
-                    (l + r) / (l - r),
-                    (t + b) / (b - t),
-                    0.5,
-                    1.0,
-                ],
-            },
+        let mat_proj = Matrix4x4 {
+            M11: 2.0 / (r - l),
+            M12: 0.0,
+            M13: 0.0,
+            M14: 0.0,
+            M21: 0.0,
+            M22: 2.0 / (t - b),
+            M23: 0.0,
+            M24: 0.0,
+            M31: 0.0,
+            M32: 0.0,
+            M33: 0.5,
+            M34: 0.0,
+            M41: (l + r) / (l - r),
+            M42: (t + b) / (b - t),
+            M43: 0.5,
+            M44: 1.0,
         };
 
         dev.SetTransform(D3DTS_WORLD, &mat_ident)?;

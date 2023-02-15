@@ -11,19 +11,19 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-egui = "0.20.1"
-libc = "*"
-image = { version = "*" }
+egui = "0.21.0"
+libc = "0.2"
+image = { version = "0.24" }
 shroud = { version = "*", features = ["directx9"] }
-detour = { git = "https://github.com/Hpmason/detour-rs.git", branch = "fix-nightly1.67.0-changes" }
+retour = "0.1.0"
 egui-d3d9 = { path = "../egui-d3d9" }
 
 [dependencies.egui_extras]
-version = "0.20.0"
+version = "0.21.0"
 features = ["image"]
 
 [dependencies.windows]
-version = "*"
+version = "0.44.0"
 features = [
     "Win32_UI_WindowsAndMessaging",
     "Win32_Graphics_Dxgi_Common",
