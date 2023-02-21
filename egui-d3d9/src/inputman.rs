@@ -18,7 +18,7 @@ use windows::Win32::{
             WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDBLCLK, WM_MBUTTONDOWN, WM_MBUTTONUP,
             WM_MOUSEHWHEEL, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_RBUTTONDBLCLK, WM_RBUTTONDOWN,
             WM_RBUTTONUP, WM_SYSKEYDOWN, WM_SYSKEYUP, WM_XBUTTONDBLCLK, WM_XBUTTONDOWN,
-            WM_XBUTTONUP, XBUTTON1, XBUTTON2,
+            WM_XBUTTONUP, XBUTTON1, XBUTTON2, KF_REPEAT,
         },
     },
 };
@@ -239,7 +239,7 @@ impl InputManager {
                         pressed: true,
                         modifiers,
                         key,
-                        repeat: lparam & 0b1111_1111_1111_1111_0000_0000_0000_0000 > 0,
+                        repeat: lparam & (KF_REPEAT as isize) > 0,
                     });
                 }
                 InputResult::Key
