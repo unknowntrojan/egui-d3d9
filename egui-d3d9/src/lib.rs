@@ -1,5 +1,3 @@
-#![feature(once_cell)]
-
 macro_rules! expect {
     ($val:expr, $msg:expr) => {
         if cfg!(feature = "silent") {
