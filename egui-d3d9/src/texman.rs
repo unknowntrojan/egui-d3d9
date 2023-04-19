@@ -236,7 +236,6 @@ fn create_temporary_texture(
     unsafe {
         let mut temp_texture: Option<IDirect3DTexture9> = None;
         let pixel_ptr = buf.as_ptr();
-        println!("creating temporary texture: {:?}", size);
 
         expect!(
             dev.CreateTexture(
