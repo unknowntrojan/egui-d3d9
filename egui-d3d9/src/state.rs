@@ -1,21 +1,23 @@
 use windows::{
     Foundation::Numerics::Matrix4x4,
     Win32::{
+        Foundation::RECT,
         Graphics::Direct3D9::{
             IDirect3DDevice9, IDirect3DStateBlock9, IDirect3DSurface9, D3DBACKBUFFER_TYPE_MONO,
             D3DBLENDOP_ADD, D3DBLEND_INVSRCALPHA, D3DBLEND_ONE, D3DBLEND_SRCALPHA, D3DCULL_NONE,
-            D3DFILL_SOLID, D3DRS_ALPHABLENDENABLE, D3DRS_ALPHATESTENABLE, D3DRS_BLENDOP,
-            D3DRS_BLENDOPALPHA, D3DRS_CLIPPING, D3DRS_COLORWRITEENABLE, D3DRS_CULLMODE,
-            D3DRS_DESTBLEND, D3DRS_DESTBLENDALPHA, D3DRS_FILLMODE, D3DRS_FOGENABLE,
+            D3DFILL_SOLID, D3DMULTISAMPLE_TYPE, D3DRS_ALPHABLENDENABLE, D3DRS_ALPHATESTENABLE,
+            D3DRS_BLENDOP, D3DRS_BLENDOPALPHA, D3DRS_CLIPPING, D3DRS_COLORWRITEENABLE,
+            D3DRS_CULLMODE, D3DRS_DESTBLEND, D3DRS_DESTBLENDALPHA, D3DRS_FILLMODE, D3DRS_FOGENABLE,
             D3DRS_LASTPIXEL, D3DRS_LIGHTING, D3DRS_RANGEFOGENABLE, D3DRS_SCISSORTESTENABLE,
             D3DRS_SEPARATEALPHABLENDENABLE, D3DRS_SHADEMODE, D3DRS_SPECULARENABLE, D3DRS_SRCBLEND,
             D3DRS_SRCBLENDALPHA, D3DRS_SRGBWRITEENABLE, D3DRS_STENCILENABLE, D3DRS_TEXTUREFACTOR,
             D3DRS_ZENABLE, D3DRS_ZWRITEENABLE, D3DSAMP_ADDRESSU, D3DSAMP_ADDRESSV,
             D3DSAMP_ADDRESSW, D3DSAMP_BORDERCOLOR, D3DSAMP_MAGFILTER, D3DSAMP_MINFILTER,
-            D3DSAMP_MIPFILTER, D3DSBT_ALL, D3DSHADE_GOURAUD, D3DTADDRESS_CLAMP, D3DTEXF_LINEAR,
-            D3DTOP_DISABLE, D3DTOP_MODULATE, D3DTSS_ALPHAARG0, D3DTSS_ALPHAARG1, D3DTSS_ALPHAARG2,
-            D3DTSS_ALPHAOP, D3DTSS_COLORARG0, D3DTSS_COLORARG1, D3DTSS_COLORARG2, D3DTSS_COLOROP,
-            D3DTS_PROJECTION, D3DTS_VIEW, D3DTS_WORLD, D3DVIEWPORT9,
+            D3DSAMP_MIPFILTER, D3DSBT_ALL, D3DSHADE_GOURAUD, D3DSURFACE_DESC, D3DTADDRESS_CLAMP,
+            D3DTEXF_LINEAR, D3DTEXF_NONE, D3DTOP_DISABLE, D3DTOP_MODULATE, D3DTSS_ALPHAARG0,
+            D3DTSS_ALPHAARG1, D3DTSS_ALPHAARG2, D3DTSS_ALPHAOP, D3DTSS_COLORARG0, D3DTSS_COLORARG1,
+            D3DTSS_COLORARG2, D3DTSS_COLOROP, D3DTS_PROJECTION, D3DTS_VIEW, D3DTS_WORLD,
+            D3DVIEWPORT9,
         },
         System::SystemServices::{D3DTA_CURRENT, D3DTA_DIFFUSE, D3DTA_TEXTURE},
     },
@@ -28,6 +30,7 @@ pub struct DxState {
     original_world: Matrix4x4,
     original_view: Matrix4x4,
     original_proj: Matrix4x4,
+    backbuffer: IDirect3DSurface9,
     dev: IDirect3DDevice9,
 }
 
@@ -64,6 +67,11 @@ impl DxState {
                 "unable to backup projection matrix"
             );
 
+            let backbuffer = expect!(
+                dev.GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO),
+                "unable to get original backbuffer"
+            );
+
             // set our desired state
             expect!(setup_state(dev, viewport), "unable to setup state");
 
@@ -72,6 +80,7 @@ impl DxState {
                 original_world,
                 original_view,
                 original_proj,
+                backbuffer,
                 dev: dev.clone(),
             }
         }
@@ -95,6 +104,29 @@ impl Drop for DxState {
                 "unable to reset projection matrix"
             );
 
+            let backbuffer = expect!(
+                self.dev.GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO),
+                "unable to get back buffer"
+            );
+
+            let render_target = expect!(self.dev.GetRenderTarget(0), "unable to get render target");
+
+            expect!(
+                self.dev.StretchRect(
+                    &render_target,
+                    std::ptr::null(),
+                    &backbuffer,
+                    std::ptr::null(),
+                    D3DTEXF_NONE,
+                ),
+                "unable to overwrite back buffer"
+            );
+
+            expect!(
+                self.dev.SetRenderTarget(0, &self.backbuffer),
+                "unable to get original backbuffer"
+            );
+
             expect!(
                 self.original_state.Apply(),
                 "unable to re-apply captured state"
@@ -110,7 +142,35 @@ fn setup_state(
     unsafe {
         // general set up
         let backbuffer: IDirect3DSurface9 = dev.GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO)?;
-        dev.SetRenderTarget(0, &backbuffer)?;
+
+        let mut desc = D3DSURFACE_DESC::default();
+        backbuffer.GetDesc(&mut desc)?;
+
+        let mut surface: Option<IDirect3DSurface9> = None;
+
+        dev.CreateRenderTarget(
+            desc.Width,
+            desc.Height,
+            desc.Format,
+            D3DMULTISAMPLE_TYPE(0),
+            0,
+            true,
+            &mut surface,
+            std::ptr::null_mut(),
+        )?;
+
+        let surface = surface.ok_or("unable to create surface")?;
+
+        dev.SetRenderTarget(0, &surface)?;
+
+        dev.StretchRect(
+            &backbuffer,
+            std::ptr::null(),
+            &surface,
+            std::ptr::null(),
+            D3DTEXF_NONE,
+        )?;
+
         dev.SetViewport(&viewport)?;
 
         // set up fvf
