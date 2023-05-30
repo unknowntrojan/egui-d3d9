@@ -4,8 +4,8 @@ use egui::{ImageData, TextureId, TexturesDelta};
 use windows::Win32::{
     Foundation::{POINT, RECT},
     Graphics::Direct3D9::{
-        IDirect3DDevice9, IDirect3DTexture9, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT, D3DPOOL_SYSTEMMEM,
-        D3DUSAGE_DYNAMIC,
+        IDirect3DDevice9, IDirect3DTexture9, D3DFMT_A8R8G8B8, D3DLOCKED_RECT, D3DLOCK_DISCARD,
+        D3DLOCK_READONLY, D3DPOOL_DEFAULT, D3DPOOL_SYSTEMMEM, D3DUSAGE_DYNAMIC,
     },
 };
 
@@ -235,7 +235,6 @@ fn create_temporary_texture(
 ) -> IDirect3DTexture9 {
     unsafe {
         let mut temp_texture: Option<IDirect3DTexture9> = None;
-        let pixel_ptr = buf.as_ptr();
 
         expect!(
             dev.CreateTexture(
@@ -246,12 +245,34 @@ fn create_temporary_texture(
                 D3DFMT_A8R8G8B8,
                 D3DPOOL_SYSTEMMEM,
                 &mut temp_texture,
-                std::mem::transmute(&pixel_ptr)
+                std::ptr::null_mut()
             ),
             "unable to create temporary texture"
         );
 
-        expect!(temp_texture, "unable to create temporary texture")
+        let temp_texture = expect!(temp_texture, "unable to create temporary texture");
+
+        let mut locked_rect = D3DLOCKED_RECT::default();
+
+        expect!(
+            temp_texture.LockRect(
+                0,
+                &mut locked_rect,
+                std::ptr::null_mut(),
+                D3DLOCK_DISCARD as u32 | D3DLOCK_READONLY as u32
+            ),
+            "unable to lock temporary texture"
+        );
+
+        std::slice::from_raw_parts_mut(locked_rect.pBits as *mut TextureColor, size[0] * size[1])
+            .copy_from_slice(buf);
+
+        expect!(
+            temp_texture.UnlockRect(0),
+            "unable to unlock temporary texture"
+        );
+
+        temp_texture
     }
 }
 
