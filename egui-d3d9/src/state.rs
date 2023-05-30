@@ -1,7 +1,6 @@
 use windows::{
     Foundation::Numerics::Matrix4x4,
     Win32::{
-        Foundation::RECT,
         Graphics::Direct3D9::{
             IDirect3DDevice9, IDirect3DStateBlock9, IDirect3DSurface9, D3DBACKBUFFER_TYPE_MONO,
             D3DBLENDOP_ADD, D3DBLEND_INVSRCALPHA, D3DBLEND_ONE, D3DBLEND_SRCALPHA, D3DCULL_NONE,
