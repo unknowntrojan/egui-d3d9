@@ -1,6 +1,6 @@
 [package]
 name    = "egui-d3d9"
-version = "0.2.6"
+version = "0.2.7"
 # input & most of mesh processing as well as general structure copied from sy1ntexx's egui-d3d11
 authors     = ["unknowntrojan"]
 description = "D3D9 backend for egui"
@@ -17,4 +17,4 @@ silent = []
 windows = { version = "0.48.0", features = ["Win32_UI_Input_KeyboardAndMouse", "Win32_System_WindowsProgramming", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Direct3D_Fxc", "Win32_System_SystemServices", "Win32_Graphics_Dxgi_Common", "Win32_UI_Controls_RichEdit", "Win32_Graphics_Direct3D9", "Win32_System_DataExchange", "Win32_Graphics_Dxgi", "Win32_Graphics_Hlsl", "Win32_System_Memory", "Win32_Foundation", "Foundation_Numerics"] }
 
 clipboard = "0.5.0"
-egui      = "0.21.0"
+egui      = "0.22.0"

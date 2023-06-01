@@ -14,11 +14,11 @@ use windows::Win32::{
             VK_RIGHT, VK_SPACE, VK_TAB, VK_UP,
         },
         WindowsAndMessaging::{
-            GetClientRect, WHEEL_DELTA, WM_CHAR, WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDBLCLK,
+            GetClientRect, KF_REPEAT, WHEEL_DELTA, WM_CHAR, WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDBLCLK,
             WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDBLCLK, WM_MBUTTONDOWN, WM_MBUTTONUP,
             WM_MOUSEHWHEEL, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_RBUTTONDBLCLK, WM_RBUTTONDOWN,
             WM_RBUTTONUP, WM_SYSKEYDOWN, WM_SYSKEYUP, WM_XBUTTONDBLCLK, WM_XBUTTONDOWN,
-            WM_XBUTTONUP, XBUTTON1, XBUTTON2, KF_REPEAT,
+            WM_XBUTTONUP, XBUTTON1, XBUTTON2,
         },
     },
 };
@@ -279,7 +279,7 @@ impl InputManager {
             predicted_dt: 1. / 60.,
             hovered_files: vec![],
             dropped_files: vec![],
-            has_focus: true,
+            focused: true,
         }
     }
 
