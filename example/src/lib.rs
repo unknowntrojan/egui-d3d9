@@ -16,7 +16,10 @@ use windows::{
     Win32::{
         Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM},
         Graphics::{
-            Direct3D9::{IDirect3DDevice9, IDirect3DSwapChain9, D3DDEVICE_CREATION_PARAMETERS},
+            Direct3D9::{
+                IDirect3DDevice9, IDirect3DSwapChain9, D3DDEVICE_CREATION_PARAMETERS,
+                D3DPRESENT_PARAMETERS,
+            },
             Dxgi::Common::DXGI_FORMAT,
             Gdi::RGNDATA,
         },
@@ -41,6 +44,7 @@ static mut OLD_WND_PROC: Option<WNDPROC> = None;
 
 static_detour! {
     static PresentHook: unsafe extern "stdcall" fn(IDirect3DDevice9, *const RECT, *const RECT, HWND, *const RGNDATA) -> HRESULT;
+    static ResetHook: unsafe extern "stdcall" fn(IDirect3DDevice9, *const D3DPRESENT_PARAMETERS) -> HRESULT;
 }
 
 type FnPresent = unsafe extern "stdcall" fn(
@@ -50,7 +54,11 @@ type FnPresent = unsafe extern "stdcall" fn(
     HWND,
     *const RGNDATA,
 ) -> HRESULT;
+type FnReset =
+    unsafe extern "stdcall" fn(IDirect3DDevice9, *const D3DPRESENT_PARAMETERS) -> HRESULT;
+
 static mut O_PRESENT: Option<FnPresent> = None;
+static mut O_RESET: Option<FnReset> = None;
 
 fn hk_present(
     dev: IDirect3DDevice9,
@@ -77,6 +85,19 @@ fn hk_present(
         APP.as_mut().unwrap().present(&dev);
 
         PresentHook.call(dev, source_rect, dest_rect, window, rgn_data)
+    }
+}
+
+fn hk_reset(
+    dev: IDirect3DDevice9,
+    presentation_parameters: *const D3DPRESENT_PARAMETERS,
+) -> HRESULT {
+    unsafe {
+        let ret = ResetHook.call(dev.clone(), presentation_parameters);
+
+        APP.as_mut().unwrap().reset(&dev);
+
+        ret
     }
 }
 
@@ -265,14 +286,23 @@ unsafe fn main_thread(_hinst: usize) {
 
     let methods = shroud::directx::directx9::methods().unwrap();
 
+    let reset = methods.device_vmt()[16];
     let present = methods.device_vmt()[17];
 
     eprintln!("Present: {:X}", present as usize);
+    eprintln!("Reset: {:X}", reset as usize);
 
-    let present: FnPresent = std::mem::transmute(methods.device_vmt()[17]);
+    let present: FnPresent = std::mem::transmute(present);
+    let reset: FnReset = std::mem::transmute(reset);
 
     PresentHook
         .initialize(present, hk_present)
+        .unwrap()
+        .enable()
+        .unwrap();
+
+    ResetHook
+        .initialize(reset, hk_reset)
         .unwrap()
         .enable()
         .unwrap();

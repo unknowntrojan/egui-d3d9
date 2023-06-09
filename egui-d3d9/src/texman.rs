@@ -69,6 +69,14 @@ impl TextureManager {
     pub fn get_by_id(&self, id: TextureId) -> &IDirect3DTexture9 {
         &expect!(self.textures.get(&id), "unable to retrieve texture").handle
     }
+
+    pub fn reallocate_textures(&mut self, dev: &IDirect3DDevice9) {
+        self.textures.iter_mut().for_each(|(_tid, texture)| {
+            let handle = new_texture_from_buffer(dev, &texture.pixels, texture.size);
+
+            texture.handle = handle;
+        });
+    }
 }
 
 impl TextureManager {

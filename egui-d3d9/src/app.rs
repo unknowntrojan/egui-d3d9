@@ -64,6 +64,12 @@ impl<T> EguiDx9<T> {
         }
     }
 
+    pub fn reset(&mut self, dev: &IDirect3DDevice9) {
+        // re-allocate textures, buffers
+        self.buffers = Buffers::create_buffers(dev, 16384, 16384);
+        self.tex_man.reallocate_textures(dev);
+    }
+
     pub fn present(&mut self, dev: &IDirect3DDevice9) {
         let output = self.ctx.run(self.input_man.collect_input(), |ctx| {
             // safe. present will never run in parallel.
