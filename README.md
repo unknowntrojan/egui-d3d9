@@ -1,5 +1,7 @@
 # egui-d3d9
 
+![crates.io](https://img.shields.io/crates/v/egui-d3d9.svg)
+
 D3D9 backend for [egui](https://github.com/emilk/egui).
 Primarily intended for source games like CS:GO and GMod.
 
