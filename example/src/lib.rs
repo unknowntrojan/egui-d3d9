@@ -71,7 +71,8 @@ fn hk_present(
         static INIT: Once = Once::new();
 
         INIT.call_once(|| {
-            let window = FindWindowA(s!("Valve001"), PCSTR(std::ptr::null()));
+            // let window = FindWindowA(s!("Valve001"), PCSTR(std::ptr::null()));
+            let window = FindWindowA(s!("Direct3DWindowClass"), PCSTR(std::ptr::null()));
 
             APP = Some(EguiDx9::init(&dev, window, ui, 0, true));
 
@@ -93,11 +94,9 @@ fn hk_reset(
     presentation_parameters: *const D3DPRESENT_PARAMETERS,
 ) -> HRESULT {
     unsafe {
-        let ret = ResetHook.call(dev, presentation_parameters);
+        APP.as_mut().unwrap().pre_reset();
 
-        APP.as_mut().unwrap().reset();
-
-        ret
+        ResetHook.call(dev, presentation_parameters)
     }
 }
 
@@ -279,8 +278,10 @@ unsafe fn main_thread(_hinst: usize) {
 
     unsafe {
         // for valve games
-        while GetModuleHandleA(s!("serverbrowser.dll")).is_err() {
-            std::thread::sleep(Duration::new(0, 100_000_000));
+        if FindWindowA(s!("Valve001"), PCSTR(std::ptr::null_mut())).0 != 0 {
+            while GetModuleHandleA(s!("serverbrowser.dll")).is_err() {
+                std::thread::sleep(Duration::new(0, 100_000_000));
+            }
         }
     }
 

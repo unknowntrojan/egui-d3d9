@@ -66,7 +66,7 @@ impl<T> EguiDx9<T> {
         }
     }
 
-    pub fn reset(&mut self) {
+    pub fn pre_reset(&mut self) {
         self.buffers.delete_buffers();
         self.tex_man.deallocate_textures();
 
