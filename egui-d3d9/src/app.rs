@@ -74,6 +74,10 @@ impl<T> EguiDx9<T> {
     }
 
     pub fn present(&mut self, dev: &IDirect3DDevice9) {
+        if unsafe { dev.TestCooperativeLevel() }.is_err() {
+            return;
+        }
+
         if self.should_reset {
             self.buffers = Buffers::create_buffers(dev, 16384, 16384);
             self.tex_man.reallocate_textures(dev);
