@@ -26,6 +26,7 @@ pub struct EguiDx9<T> {
     prims: Vec<MeshDescriptor>,
     last_idx_capacity: usize,
     last_vtx_capacity: usize,
+    should_reset: bool,
 }
 
 impl<T> EguiDx9<T> {
@@ -61,20 +62,33 @@ impl<T> EguiDx9<T> {
             prims: Vec::new(),
             last_idx_capacity: 0,
             last_vtx_capacity: 0,
+            should_reset: false,
         }
     }
 
-    pub fn reset(&mut self, dev: &IDirect3DDevice9) {
-        // re-allocate textures, buffers
-        self.buffers = Buffers::create_buffers(dev, 16384, 16384);
-        self.tex_man.reallocate_textures(dev);
+    pub fn reset(&mut self) {
+        self.buffers.delete_buffers();
+        self.tex_man.deallocate_textures();
+
+        self.should_reset = true;
     }
 
     pub fn present(&mut self, dev: &IDirect3DDevice9) {
-        let output = self.ctx.run(self.input_man.collect_input(), |ctx| {
+        if self.should_reset {
+            self.buffers = Buffers::create_buffers(dev, 16384, 16384);
+            self.tex_man.reallocate_textures(dev);
+        }
+
+        let mut output = self.ctx.run(self.input_man.collect_input(), |ctx| {
             // safe. present will never run in parallel.
             (self.ui_fn)(ctx, &mut self.ui_state)
         });
+
+        if self.should_reset {
+            output.repaint_after = std::time::Duration::ZERO;
+
+            self.should_reset = false;
+        }
 
         if !output.textures_delta.is_empty() {
             self.tex_man.process_set_deltas(dev, &output.textures_delta);
@@ -137,7 +151,7 @@ impl<T> EguiDx9<T> {
             expect!(
                 dev.SetStreamSource(
                     0,
-                    &self.buffers.vtx,
+                    expect!(self.buffers.vtx.as_ref(), "unable to get vertex buffer"),
                     0,
                     std::mem::size_of::<GpuVertex>() as _
                 ),
@@ -145,7 +159,10 @@ impl<T> EguiDx9<T> {
             );
 
             expect!(
-                dev.SetIndices(&self.buffers.idx),
+                dev.SetIndices(expect!(
+                    self.buffers.idx.as_ref(),
+                    "unable to get index buffer"
+                ),),
                 "unable to set index buffer"
             );
         }
@@ -210,5 +227,12 @@ impl<T> EguiDx9<T> {
             MinZ: 0.,
             MaxZ: 1.,
         }
+    }
+}
+
+impl<T> Drop for EguiDx9<T> {
+    fn drop(&mut self) {
+        self.buffers.delete_buffers();
+        self.tex_man.deallocate_textures();
     }
 }

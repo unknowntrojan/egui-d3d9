@@ -93,9 +93,9 @@ fn hk_reset(
     presentation_parameters: *const D3DPRESENT_PARAMETERS,
 ) -> HRESULT {
     unsafe {
-        let ret = ResetHook.call(dev.clone(), presentation_parameters);
+        let ret = ResetHook.call(dev, presentation_parameters);
 
-        APP.as_mut().unwrap().reset(&dev);
+        APP.as_mut().unwrap().reset();
 
         ret
     }

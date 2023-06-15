@@ -84,8 +84,8 @@ pub struct GpuVertex {
 }
 
 pub struct Buffers {
-    pub vtx: IDirect3DVertexBuffer9,
-    pub idx: IDirect3DIndexBuffer9,
+    pub vtx: Option<IDirect3DVertexBuffer9>,
+    pub idx: Option<IDirect3DIndexBuffer9>,
     vtx_size: usize,
     idx_size: usize,
 }
@@ -99,9 +99,14 @@ impl Buffers {
         Buffers {
             vtx_size: vtx_count,
             idx_size: idx_count,
-            vtx: Self::create_vertex_buffer(device, vtx_count),
-            idx: Self::create_index_buffer(device, idx_count),
+            vtx: Some(Self::create_vertex_buffer(device, vtx_count)),
+            idx: Some(Self::create_index_buffer(device, idx_count)),
         }
+    }
+
+    pub fn delete_buffers(&mut self) {
+        self.vtx = None;
+        self.idx = None;
     }
 
     fn create_vertex_buffer(device: &IDirect3DDevice9, vertices: usize) -> IDirect3DVertexBuffer9 {
@@ -148,11 +153,11 @@ impl Buffers {
 
             if self.vtx_size < buf_len {
                 let new_size = buf_len + 1024;
-                self.vtx = Self::create_vertex_buffer(device, new_size);
+                self.vtx = Some(Self::create_vertex_buffer(device, new_size));
                 self.vtx_size = new_size;
             }
 
-            let vtx = &mut self.vtx;
+            let vtx = expect!(self.vtx.as_mut(), "unable to get vertex buffer");
 
             let mut buffer: *mut GpuVertex = std::mem::zeroed();
 
@@ -180,11 +185,11 @@ impl Buffers {
 
             if self.idx_size < buf_len {
                 let new_size = buf_len + 1024;
-                self.idx = Self::create_index_buffer(device, new_size);
+                self.idx = Some(Self::create_index_buffer(device, new_size));
                 self.idx_size = new_size;
             }
 
-            let idx = &mut self.idx;
+            let idx = expect!(self.idx.as_mut(), "unable to get index buffer");
 
             let mut buffer: *mut u32 = std::mem::zeroed();
 

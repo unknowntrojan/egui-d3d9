@@ -19,7 +19,7 @@ pub struct TextureColor {
 }
 
 struct ManagedTexture {
-    handle: IDirect3DTexture9,
+    handle: Option<IDirect3DTexture9>,
     pixels: Vec<TextureColor>,
     size: [usize; 2],
 }
@@ -67,14 +67,25 @@ impl TextureManager {
     }
 
     pub fn get_by_id(&self, id: TextureId) -> &IDirect3DTexture9 {
-        &expect!(self.textures.get(&id), "unable to retrieve texture").handle
+        expect!(
+            &expect!(self.textures.get(&id), "unable to retrieve texture")
+                .handle
+                .as_ref(),
+            "unable to retrieve texture handle"
+        )
+    }
+
+    pub fn deallocate_textures(&mut self) {
+        self.textures.iter_mut().for_each(|(_tid, texture)| {
+            texture.handle = None;
+        });
     }
 
     pub fn reallocate_textures(&mut self, dev: &IDirect3DDevice9) {
         self.textures.iter_mut().for_each(|(_tid, texture)| {
             let handle = new_texture_from_buffer(dev, &texture.pixels, texture.size);
 
-            texture.handle = handle;
+            texture.handle = Some(handle);
         });
     }
 }
@@ -98,7 +109,7 @@ impl TextureManager {
         self.textures.insert(
             *tid,
             ManagedTexture {
-                handle,
+                handle: Some(handle),
                 pixels,
                 size,
             },
@@ -130,7 +141,7 @@ impl TextureManager {
             let src_surface = expect!(temp_tex.GetSurfaceLevel(0), "unable to get tex surface");
 
             let dst_surface = expect!(
-                texture.handle.GetSurfaceLevel(0),
+                expect!(texture.handle.as_ref(), "unable to get texture handle").GetSurfaceLevel(0),
                 "unable to get tex surface"
             );
 
@@ -177,7 +188,7 @@ impl TextureManager {
             self.textures.insert(
                 *tid,
                 ManagedTexture {
-                    handle,
+                    handle: Some(handle),
                     pixels,
                     size,
                 },
@@ -188,17 +199,22 @@ impl TextureManager {
 
             unsafe {
                 expect!(
-                    texture.handle.AddDirtyRect(&RECT {
-                        left: 0,
-                        top: 0,
-                        right: size[0] as _,
-                        bottom: size[1] as _
-                    }),
+                    expect!(texture.handle.as_ref(), "unable to get texture handle").AddDirtyRect(
+                        &RECT {
+                            left: 0,
+                            top: 0,
+                            right: size[0] as _,
+                            bottom: size[1] as _
+                        }
+                    ),
                     "unable to dirty texture"
                 );
 
                 expect!(
-                    dev.UpdateTexture(&temp_tex, &texture.handle),
+                    dev.UpdateTexture(
+                        &temp_tex,
+                        expect!(texture.handle.as_ref(), "unable to get texture handle")
+                    ),
                     "unable to update texture"
                 );
             }
