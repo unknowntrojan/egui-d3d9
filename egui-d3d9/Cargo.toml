@@ -1,10 +1,11 @@
 [package]
 name    = "egui-d3d9"
-version = "0.3.1"
+version = "0.3.2"
 # input & most of mesh processing as well as general structure copied from sy1ntexx's egui-d3d11
 authors     = ["unknowntrojan"]
 description = "D3D9 backend for egui"
 repository  = "https://github.com/unknowntrojan/egui-d3d9"
+readme      = "../README.md"
 
 # license transferred over from input manager & example
 license = "MIT"
