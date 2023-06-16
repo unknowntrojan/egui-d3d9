@@ -5,7 +5,6 @@ version = "0.3.2"
 authors     = ["unknowntrojan"]
 description = "D3D9 backend for egui"
 repository  = "https://github.com/unknowntrojan/egui-d3d9"
-readme      = "../README.md"
 
 # license transferred over from input manager & example
 license = "MIT"
