@@ -1,18 +1,19 @@
 #![allow(warnings)]
+
+use retour::static_detour;
+
 use egui::{
     Align2, Color32, Context, FontData, FontDefinitions, FontFamily, FontId, FontTweak, Key,
     Modifiers, Pos2, Rect, RichText, ScrollArea, Slider, Stroke, TextureId, Vec2, Widget,
 };
 use egui_d3d9::EguiDx9;
-use retour::static_detour;
 use std::{
     intrinsics::transmute,
     sync::{Arc, Once},
     time::Duration,
 };
 use windows::{
-    core::{HRESULT, PCSTR},
-    s,
+    core::{HRESULT, PCSTR, s},
     Win32::{
         Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM},
         Graphics::{
@@ -29,6 +30,7 @@ use windows::{
         },
     },
 };
+
 
 #[no_mangle]
 extern "stdcall" fn DllMain(hinst: usize, reason: u32, _reserved: *mut ()) -> i32 {
@@ -285,7 +287,7 @@ unsafe fn main_thread(_hinst: usize) {
         }
     }
 
-    let methods = shroud::directx::directx9::methods().unwrap();
+    let methods = shroud::directx9::methods().unwrap();
 
     let reset = methods.device_vmt()[16];
     let present = methods.device_vmt()[17];

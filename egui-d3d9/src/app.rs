@@ -213,7 +213,10 @@ impl<T> EguiDx9<T> {
     fn get_screen_size(&self) -> (f32, f32) {
         let mut rect = RECT::default();
         unsafe {
-            GetClientRect(self.hwnd, &mut rect);
+            expect!(
+                GetClientRect(self.hwnd, &mut rect),
+                "Failed to GetClientRect()"
+            );
         }
         (
             (rect.right - rect.left) as f32,

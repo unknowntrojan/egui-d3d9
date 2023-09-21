@@ -3,9 +3,9 @@ use windows::Win32::{
     Foundation::{HANDLE, RECT},
     Graphics::Direct3D9::{
         IDirect3DDevice9, IDirect3DIndexBuffer9, IDirect3DVertexBuffer9, D3DFMT_INDEX32,
-        D3DLOCK_DISCARD, D3DPOOL_DEFAULT, D3DUSAGE_DYNAMIC, D3DUSAGE_WRITEONLY,
+        D3DFVF_DIFFUSE, D3DFVF_TEX1, D3DFVF_XYZ, D3DLOCK_DISCARD, D3DPOOL_DEFAULT,
+        D3DUSAGE_DYNAMIC, D3DUSAGE_WRITEONLY,
     },
-    System::SystemServices::{D3DFVF_DIFFUSE, D3DFVF_TEX1, D3DFVF_XYZ},
 };
 
 // XYZ is 32 bits completely wasted per vertex.
