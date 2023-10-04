@@ -3,8 +3,9 @@
 use retour::static_detour;
 
 use egui::{
-    Align2, Color32, Context, FontData, FontDefinitions, FontFamily, FontId, FontTweak, Key,
-    Modifiers, Pos2, Rect, RichText, ScrollArea, Slider, Stroke, TextureId, Vec2, Widget,
+    Align2, Color32, Context, FontData, FontDefinitions, FontFamily, FontId, FontTweak,
+    ImageSource, Key, Modifiers, Pos2, Rect, RichText, ScrollArea, Slider, Stroke, TextureId, Vec2,
+    Widget,
 };
 use egui_d3d9::EguiDx9;
 use std::{
@@ -13,7 +14,7 @@ use std::{
     time::Duration,
 };
 use windows::{
-    core::{HRESULT, PCSTR, s},
+    core::{s, HRESULT, PCSTR},
     Win32::{
         Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM},
         Graphics::{
@@ -30,7 +31,6 @@ use windows::{
         },
     },
 };
-
 
 #[no_mangle]
 extern "stdcall" fn DllMain(hinst: usize, reason: u32, _reserved: *mut ()) -> i32 {
@@ -209,19 +209,9 @@ fn ui(ctx: &Context, i: &mut i32) {
         });
 
         egui::Window::new("Image").show(ctx, |ui| unsafe {
-            static mut IMG: TextureId = TextureId::Managed(0);
+            const IMG: ImageSource = egui::include_image!("logo.bmp");
 
-            if IMG == TextureId::Managed(0) {
-                let tex = Box::leak(Box::new(ctx.load_texture(
-                    "logo",
-                    egui_extras::image::load_image_bytes(include_bytes!("logo.bmp")).unwrap(),
-                    egui::TextureOptions::LINEAR,
-                )));
-
-                IMG = tex.id();
-            }
-
-            ui.image(IMG, Vec2::new(500., 391.));
+            ui.image(IMG);
         });
 
         egui::Window::new("xd").show(ctx, |ui| unsafe {
