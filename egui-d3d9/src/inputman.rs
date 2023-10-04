@@ -1,24 +1,24 @@
 #![allow(dead_code)]
 use clipboard::{windows_clipboard::WindowsClipboardContext, ClipboardProvider};
 use egui::{Event, Key, Modifiers, PointerButton, Pos2, RawInput, Rect, Vec2};
-use windows::Win32::{
-    Foundation::{HWND, RECT},
-    System::{
-        SystemServices::{MK_CONTROL, MK_SHIFT},
-        WindowsProgramming::NtQuerySystemTime,
-    },
-    UI::{
-        Input::KeyboardAndMouse::{
-            GetAsyncKeyState, VIRTUAL_KEY, VK_BACK, VK_CONTROL, VK_DELETE, VK_DOWN, VK_END,
-            VK_ESCAPE, VK_HOME, VK_INSERT, VK_LEFT, VK_LSHIFT, VK_NEXT, VK_PRIOR, VK_RETURN,
-            VK_RIGHT, VK_SPACE, VK_TAB, VK_UP,
-        },
-        WindowsAndMessaging::{
-            GetClientRect, KF_REPEAT, WHEEL_DELTA, WM_CHAR, WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDBLCLK,
-            WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDBLCLK, WM_MBUTTONDOWN, WM_MBUTTONUP,
-            WM_MOUSEHWHEEL, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_RBUTTONDBLCLK, WM_RBUTTONDOWN,
-            WM_RBUTTONUP, WM_SYSKEYDOWN, WM_SYSKEYUP, WM_XBUTTONDBLCLK, WM_XBUTTONDOWN,
-            WM_XBUTTONUP, XBUTTON1, XBUTTON2,
+use windows::{
+    Wdk::System::SystemInformation::NtQuerySystemTime,
+    Win32::{
+        Foundation::{HWND, RECT},
+        System::SystemServices::{MK_CONTROL, MK_SHIFT},
+        UI::{
+            Input::KeyboardAndMouse::{
+                GetAsyncKeyState, VIRTUAL_KEY, VK_BACK, VK_CONTROL, VK_DELETE, VK_DOWN, VK_END,
+                VK_ESCAPE, VK_HOME, VK_INSERT, VK_LEFT, VK_LSHIFT, VK_NEXT, VK_PRIOR, VK_RETURN,
+                VK_RIGHT, VK_SPACE, VK_TAB, VK_UP,
+            },
+            WindowsAndMessaging::{
+                GetClientRect, KF_REPEAT, WHEEL_DELTA, WM_CHAR, WM_KEYDOWN, WM_KEYUP,
+                WM_LBUTTONDBLCLK, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDBLCLK, WM_MBUTTONDOWN,
+                WM_MBUTTONUP, WM_MOUSEHWHEEL, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_RBUTTONDBLCLK,
+                WM_RBUTTONDOWN, WM_RBUTTONUP, WM_SYSKEYDOWN, WM_SYSKEYUP, WM_XBUTTONDBLCLK,
+                WM_XBUTTONDOWN, WM_XBUTTONUP, XBUTTON1, XBUTTON2,
+            },
         },
     },
 };
@@ -301,7 +301,10 @@ impl InputManager {
     pub fn get_screen_size(&self) -> Pos2 {
         let mut rect = RECT::default();
         unsafe {
-            GetClientRect(self.hwnd, &mut rect);
+            expect!(
+                GetClientRect(self.hwnd, &mut rect),
+                "Failed to GetClientRect()"
+            );
         }
 
         Pos2::new(
