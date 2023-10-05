@@ -227,13 +227,15 @@ impl TextureManager {
 fn pixels_from_imagedata(img_data: &ImageData) -> Vec<TextureColor> {
     match img_data {
         ImageData::Font(f) => f
-            .pixels
-            .iter()
-            .map(|x| TextureColor {
-                r: 0xFF,
-                g: 0xFF,
-                b: 0xFF,
-                a: (x * 255f32) as u8,
+            .srgba_pixels(None)
+            .map(|c| {
+                let cols = c.to_array();
+                TextureColor {
+                    r: cols[0],
+                    g: cols[1],
+                    b: cols[2],
+                    a: cols[3],
+                }
             })
             .collect(),
         ImageData::Color(x) => x
