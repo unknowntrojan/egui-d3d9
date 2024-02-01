@@ -287,7 +287,10 @@ impl InputManager {
     pub fn get_system_time() -> f64 {
         let mut time = 0;
         unsafe {
-            expect!(NtQuerySystemTime(&mut time), "Failed to get system time");
+            expect!(
+                NtQuerySystemTime(&mut time).ok(),
+                "Failed to get system time"
+            );
         }
 
         // dumb ass, read the docs. egui clearly says `in seconds`.

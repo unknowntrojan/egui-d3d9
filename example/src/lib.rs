@@ -144,7 +144,7 @@ fn ui(ctx: &Context, i: &mut i32) {
             //     .unwrap()
             //     .push("my_font".to_owned());
             // ctx.set_fonts(fonts);
-			egui_extras::install_image_loaders(ctx);
+            egui_extras::install_image_loaders(ctx);
         });
 
         if TEXT.is_none() {
