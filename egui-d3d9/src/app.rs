@@ -46,7 +46,7 @@ impl<T> EguiDx9<T> {
         ui_state: T,
         reactive: bool,
     ) -> Self {
-        if hwnd.0 == 0 {
+        if hwnd.is_invalid() {
             panic!("invalid hwnd specified in egui init");
         }
 
@@ -83,23 +83,19 @@ impl<T> EguiDx9<T> {
             self.tex_man.reallocate_textures(dev);
         }
 
-        let mut output = self.ctx.run(self.input_man.collect_input(), |ctx| {
+        let output = self.ctx.run(self.input_man.collect_input(), |ctx| {
             // safe. present will never run in parallel.
             (self.ui_fn)(ctx, &mut self.ui_state)
         });
 
         if self.should_reset {
-            output.repaint_after = std::time::Duration::ZERO;
+            self.ctx.request_repaint();
 
             self.should_reset = false;
         }
 
         if !output.textures_delta.is_empty() {
             self.tex_man.process_set_deltas(dev, &output.textures_delta);
-        }
-
-        if !output.platform_output.copied_text.is_empty() {
-            let _ = WindowsClipboardContext.set_contents(output.platform_output.copied_text);
         }
 
         if output.shapes.is_empty() {
@@ -111,13 +107,13 @@ impl<T> EguiDx9<T> {
         }
 
         // we only need to update the buffers if we are actually changing something
-        if output.repaint_after.is_zero() || !self.reactive {
+        if self.ctx.has_requested_repaint() || !self.reactive {
             let mut vertices: Vec<GpuVertex> = Vec::with_capacity(self.last_vtx_capacity + 512);
             let mut indices: Vec<u32> = Vec::with_capacity(self.last_idx_capacity + 512);
 
             self.prims = self
                 .ctx
-                .tessellate(output.shapes)
+                .tessellate(output.shapes, output.pixels_per_point)
                 .into_iter()
                 .filter_map(|prim| {
                     if let Primitive::Mesh(mesh) = prim.primitive {
@@ -199,6 +195,16 @@ impl<T> EguiDx9<T> {
 
         if !output.textures_delta.is_empty() {
             self.tex_man.process_free_deltas(&output.textures_delta);
+        }
+
+        for cmd in output.platform_output.commands {
+            match cmd {
+                egui::OutputCommand::CopyText(text) => {
+                    let _ = WindowsClipboardContext.set_contents(text);
+                }
+                egui::OutputCommand::CopyImage(_) => {}
+                egui::OutputCommand::OpenUrl(_) => {}
+            }
         }
     }
 

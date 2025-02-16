@@ -4,8 +4,8 @@ use retour::static_detour;
 
 use egui::{
     Align2, Color32, Context, FontData, FontDefinitions, FontFamily, FontId, FontTweak,
-    ImageSource, Key, Modifiers, Pos2, Rect, RichText, ScrollArea, Slider, Stroke, TextureId, Vec2,
-    Widget,
+    ImageSource, Key, Modifiers, Pos2, Rect, RichText, ScrollArea, Slider, Stroke, StrokeKind,
+    TextureId, Vec2, Widget,
 };
 use egui_d3d9::EguiDx9;
 use std::{
@@ -74,7 +74,8 @@ fn hk_present(
 
         INIT.call_once(|| {
             // let window = FindWindowA(s!("Valve001"), PCSTR(std::ptr::null()));
-            let window = FindWindowA(s!("Valve001"), PCSTR(std::ptr::null()));
+            let window = FindWindowA(s!("Valve001"), PCSTR(std::ptr::null()))
+                .expect("unable to find valve window");
 
             APP = Some(EguiDx9::init(&dev, window, ui, 0, true));
 
@@ -230,7 +231,8 @@ fn ui(ctx: &Context, i: &mut i32) {
             },
             10.0,
             Color32::from_rgba_premultiplied(255, 0, 0, 150),
-            Stroke::none(),
+            Stroke::NONE,
+            StrokeKind::Inside,
         );
 
         // this is supposed to be color channel testing to identify if any channels have been misplaced
@@ -238,21 +240,21 @@ fn ui(ctx: &Context, i: &mut i32) {
             Pos2::new(350.0, 350.0),
             35.0,
             Color32::from_rgba_premultiplied(255, 0, 0, 0),
-            Stroke::none(),
+            Stroke::NONE,
         );
 
         ctx.debug_painter().circle(
             Pos2::new(450.0, 350.0),
             35.0,
             Color32::from_rgba_premultiplied(0, 255, 0, 0),
-            Stroke::none(),
+            Stroke::NONE,
         );
 
         ctx.debug_painter().circle(
             Pos2::new(550.0, 350.0),
             35.0,
             Color32::from_rgba_premultiplied(0, 0, 255, 0),
-            Stroke::none(),
+            Stroke::NONE,
         );
 
         ctx.debug_painter().circle(
@@ -271,7 +273,7 @@ unsafe fn main_thread(_hinst: usize) {
 
     unsafe {
         // for valve games
-        if FindWindowA(s!("Valve001"), PCSTR(std::ptr::null())).0 != 0 {
+        if FindWindowA(s!("Valve001"), PCSTR(std::ptr::null())).is_ok_and(|x| !x.is_invalid()) {
             while GetModuleHandleA(s!("serverbrowser.dll")).is_err() {
                 std::thread::sleep(Duration::new(0, 100_000_000));
             }

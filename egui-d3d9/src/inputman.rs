@@ -1,6 +1,8 @@
 #![allow(dead_code)]
 use clipboard::{windows_clipboard::WindowsClipboardContext, ClipboardProvider};
-use egui::{Event, Key, Modifiers, PointerButton, Pos2, RawInput, Rect, Vec2};
+use egui::{
+    Event, Key, Modifiers, MouseWheelUnit, PointerButton, Pos2, RawInput, Rect, Theme, Vec2,
+};
 use windows::{
     Wdk::System::SystemInformation::NtQuerySystemTime,
     Win32::{
@@ -198,7 +200,11 @@ impl InputManager {
                         .push(Event::Zoom(if delta > 0. { 1.5 } else { 0.5 }));
                     InputResult::Zoom
                 } else {
-                    self.events.push(Event::Scroll(Vec2::new(0., delta)));
+                    self.events.push(Event::MouseWheel {
+                        unit: MouseWheelUnit::Point,
+                        delta: Vec2::new(0., delta),
+                        modifiers: get_mouse_modifiers(wparam),
+                    });
                     InputResult::Scroll
                 }
             }
@@ -212,7 +218,11 @@ impl InputManager {
                         .push(Event::Zoom(if delta > 0. { 1.5 } else { 0.5 }));
                     InputResult::Zoom
                 } else {
-                    self.events.push(Event::Scroll(Vec2::new(delta, 0.)));
+                    self.events.push(Event::MouseWheel {
+                        unit: MouseWheelUnit::Point,
+                        delta: Vec2::new(delta, 0.),
+                        modifiers: get_mouse_modifiers(wparam),
+                    });
                     InputResult::Scroll
                 }
             }
@@ -237,6 +247,7 @@ impl InputManager {
 
                     self.events.push(Event::Key {
                         pressed: true,
+                        physical_key: None,
                         modifiers,
                         key,
                         repeat: lparam & (KF_REPEAT as isize) > 0,
@@ -251,6 +262,7 @@ impl InputManager {
                 if let Some(key) = get_key(wparam) {
                     self.events.push(Event::Key {
                         pressed: false,
+                        physical_key: None,
                         modifiers,
                         key,
                         repeat: false,
@@ -274,12 +286,13 @@ impl InputManager {
             events: std::mem::take(&mut self.events),
             screen_rect: Some(self.get_screen_rect()),
             time: Some(Self::get_system_time()),
-            pixels_per_point: Some(1.),
+            system_theme: get_system_theme(),
             max_texture_side: None,
             predicted_dt: 1. / 60.,
             hovered_files: vec![],
             dropped_files: vec![],
             focused: true,
+            ..Default::default()
         }
     }
 
@@ -379,6 +392,20 @@ fn get_key(wparam: usize) -> Option<Key> {
             _ => None,
         },
     }
+}
+
+fn get_system_theme() -> Option<Theme> {
+    let key = windows_registry::CURRENT_USER
+        .open(
+            "HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+        )
+        .ok()?;
+
+    Some(if key.get_u32("AppsUseLightTheme").ok()? == 1 {
+        Theme::Light
+    } else {
+        Theme::Dark
+    })
 }
 
 fn get_clipboard_text() -> Option<String> {
