@@ -1,7 +1,7 @@
 [package]
 name = "example-wnd"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 authors = ["unknowntrojan", "sy1ntexx"]
 description = "Example dll for egui d3d9 showcase."
 license = "MIT"
@@ -23,7 +23,7 @@ version = "0.31"
 features = ["image", "all_loaders"]
 
 [dependencies.windows]
-version = "0.59"
+version = "0.62.2"
 features = [
 	"Win32_UI_WindowsAndMessaging",
 	"Win32_Graphics_Dxgi_Common",

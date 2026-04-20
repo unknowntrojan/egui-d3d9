@@ -14,7 +14,7 @@ use crate::{
 };
 
 pub struct EguiDx9<T> {
-    ui_fn: Box<dyn FnMut(&Context, &mut T) + 'static>,
+    ui_fn: Box<dyn FnMut(&Context, &mut T) + 'static + Send>,
     ui_state: T,
     hwnd: HWND,
     reactive: bool,
@@ -29,6 +29,8 @@ pub struct EguiDx9<T> {
     should_reset: bool,
 }
 
+unsafe impl<T> Send for EguiDx9<T> {}
+
 impl<T> EguiDx9<T> {
     ///
     /// initialize the backend.
@@ -42,7 +44,7 @@ impl<T> EguiDx9<T> {
     pub fn init(
         dev: &IDirect3DDevice9,
         hwnd: HWND,
-        ui_fn: impl FnMut(&Context, &mut T) + 'static,
+        ui_fn: impl FnMut(&Context, &mut T) + 'static + Send,
         ui_state: T,
         reactive: bool,
     ) -> Self {
@@ -85,7 +87,7 @@ impl<T> EguiDx9<T> {
 
         let output = self.ctx.run(self.input_man.collect_input(), |ctx| {
             // safe. present will never run in parallel.
-            (self.ui_fn)(ctx, &mut self.ui_state)
+            self.ui_fn.as_mut()(ctx, &mut self.ui_state)
         });
 
         if self.should_reset {

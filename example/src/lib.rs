@@ -10,7 +10,8 @@ use egui::{
 use egui_d3d9::EguiDx9;
 use std::{
     intrinsics::transmute,
-    sync::{Arc, Once},
+    mem::MaybeUninit,
+    sync::{Arc, LazyLock, Mutex, Once, RwLock},
     time::Duration,
 };
 use windows::{
@@ -32,7 +33,7 @@ use windows::{
     },
 };
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "stdcall" fn DllMain(hinst: usize, reason: u32, _reserved: *mut ()) -> i32 {
     if reason == 1 {
         std::thread::spawn(move || unsafe { main_thread(hinst) });
@@ -41,8 +42,8 @@ extern "stdcall" fn DllMain(hinst: usize, reason: u32, _reserved: *mut ()) -> i3
     1
 }
 
-static mut APP: Option<EguiDx9<i32>> = None;
-static mut OLD_WND_PROC: Option<WNDPROC> = None;
+static APP: LazyLock<Mutex<RwLock<MaybeUninit<EguiDx9<i32>>>>> = LazyLock::new(|| Mutex::new(RwLock::new(MaybeUninit::uninit())));
+static OLD_WND_PROC: LazyLock<RwLock<WNDPROC>> = LazyLock::new(|| RwLock::new(None));
 
 static_detour! {
     static PresentHook: unsafe extern "stdcall" fn(IDirect3DDevice9, *const RECT, *const RECT, HWND, *const RGNDATA) -> HRESULT;
@@ -77,18 +78,28 @@ fn hk_present(
             let window = FindWindowA(s!("Valve001"), PCSTR(std::ptr::null()))
                 .expect("unable to find valve window");
 
-            APP = Some(EguiDx9::init(&dev, window, ui, 0, true));
 
-            OLD_WND_PROC = Some(transmute(SetWindowLongPtrA(
-                window,
-                GWLP_WNDPROC,
-                hk_wnd_proc as usize as _,
-            )));
+            {
+                let mut app_writable = APP.lock().unwrap();
+                let mut app_writable = app_writable.get_mut().unwrap();
+                app_writable.write(EguiDx9::init(&dev, window, ui, 0, true));
+            }
+            
+            {
+                let mut old_wnd_proc_writable = OLD_WND_PROC.write().unwrap();
+                *old_wnd_proc_writable = std::mem::transmute(SetWindowLongPtrA(
+                    window,
+                    GWLP_WNDPROC,
+                    hk_wnd_proc as *const() as _,
+                ));
+            }
         });
 
-        APP.as_mut().unwrap().present(&dev);
+        unsafe {
+            APP.try_lock().unwrap().get_mut().unwrap().assume_init_mut().present(&dev);
 
-        PresentHook.call(dev, source_rect, dest_rect, window, rgn_data)
+            PresentHook.call(dev, source_rect, dest_rect, window, rgn_data)
+        }
     }
 }
 
@@ -97,7 +108,7 @@ fn hk_reset(
     presentation_parameters: *const D3DPRESENT_PARAMETERS,
 ) -> HRESULT {
     unsafe {
-        APP.as_mut().unwrap().pre_reset();
+        APP.lock().unwrap().get_mut().unwrap().assume_init_mut().pre_reset();
 
         ResetHook.call(dev, presentation_parameters)
     }
@@ -109,10 +120,32 @@ unsafe extern "stdcall" fn hk_wnd_proc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    APP.as_mut().unwrap().wnd_proc(msg, wparam, lparam);
-
-    CallWindowProcW(OLD_WND_PROC.unwrap(), hwnd, msg, wparam, lparam)
-}
+    // This method is spammed like 60 frames per second (every game frame update) ...
+    unsafe {
+        {
+            // This part usually doesn't crash
+            // This is OLD_WND_PROC that needs special treatment
+            APP.lock().unwrap().get_mut().unwrap().assume_init_mut().wnd_proc(msg, wparam, lparam);
+        }
+        // ... and sometimes, SOMETIMES it pushes two events at the same time making
+        // it freeze unless you handle the lock and skip some of the events.
+        // The "sometimes" means "after you release the mouse button after clicking or dragging someting".
+        // The way to deal with it is to use a structure that allows multiple readers
+        // e.g. RwLock
+        let result = {
+            match OLD_WND_PROC.try_read() {
+                Ok(mut old_wnd_proc) => {
+                    CallWindowProcW(old_wnd_proc.clone(), hwnd, msg, wparam, lparam)
+                },
+                Err(_) => {
+                    println!("Event skipped! hwnd={:?}, msg={:?}, wparam={:?}, lparam={:?}", hwnd, msg, wparam, lparam);
+                    LRESULT(0)
+                }
+            }
+        };
+        
+        result
+    }}
 
 // most of this code is ported over from sy1ntexx's d3d11 implementation.
 static mut FRAME: i32 = 0;
@@ -148,6 +181,7 @@ fn ui(ctx: &Context, i: &mut i32) {
             egui_extras::install_image_loaders(ctx);
         });
 
+        #[allow(static_mut_refs)]
         if TEXT.is_none() {
             TEXT = Some(String::from("Test"));
         }
@@ -188,7 +222,9 @@ fn ui(ctx: &Context, i: &mut i32) {
             }
 
             unsafe {
+                #[allow(static_mut_refs)]
                 ui.checkbox(&mut UI_CHECK, "Some checkbox");
+                #[allow(static_mut_refs)]
                 ui.text_edit_singleline(TEXT.as_mut().unwrap());
                 ScrollArea::vertical().max_height(200.).show(ui, |ui| {
                     for i in 1..=100 {
@@ -196,8 +232,10 @@ fn ui(ctx: &Context, i: &mut i32) {
                     }
                 });
 
+                #[allow(static_mut_refs)]
                 Slider::new(&mut VALUE, -1.0..=1.0).ui(ui);
 
+                #[allow(static_mut_refs)]
                 ui.color_edit_button_rgb(&mut COLOR);
             }
 
