@@ -8,13 +8,13 @@ repository = "https://github.com/unknowntrojan/egui-d3d9"
 
 # license transferred over from input manager & example
 license = "MIT"
-edition = "2021"
+edition = "2024"
 
 [features]
 silent = []
 
 [dependencies]
-windows = { version = "0.59", features = [
+windows = { version = "0.62.2", features = [
 	"Win32_UI_Input_KeyboardAndMouse",
 	"Win32_System_WindowsProgramming",
 	"Win32_UI_WindowsAndMessaging",
@@ -32,6 +32,7 @@ windows = { version = "0.59", features = [
 	"Wdk_System_SystemInformation",
 ] }
 
+windows-numerics = "0.3.1"
 windows-registry = "0.4.0"
 
 clipboard = "0.5.0"
